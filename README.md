@@ -103,6 +103,31 @@ curl -X POST http://localhost:3000/twitch/recompensas -H "Content-Type: applicat
 
 > Los puntos de canal solo existen si tu canal es afiliado o partner.
 
+## Panel de control
+
+Un panel en React para ver la actividad en vivo, editar reglas sin tocar el JSON, probar eventos y administrar recompensas.
+
+**Instalación (solo la primera vez):**
+```bash
+npm run panel:install
+npm run panel:build
+```
+Después de compilarlo, `npm start` lo sirve en **http://localhost:3000**. Vuelve a ejecutar `npm run panel:build` cada vez que cambie el código del panel.
+
+**Para trabajar en el panel**, con recarga en caliente, usa dos terminales:
+```bash
+npm start            # backend en :3000
+npm run panel:dev    # panel en http://localhost:5173 (redirige /api al backend)
+```
+
+**Secciones:**
+- **Inicio:** estado de Twitch, Minecraft y la cola, más la actividad en vivo.
+- **Reglas:** editor con formulario. Se valida al guardar y se aplica al instante.
+- **Probar:** un botón por regla, eventos personalizados y comandos directos a Minecraft.
+- **Recompensas:** recompensas de tu canal y si tienen regla asignada. Desde aquí también puedes crear recompensas propias de la app (con reembolso automático).
+
+El botón **Pausar todo** de la barra lateral equivale a `!pausa`.
+
 ## 6. Botón de pánico
 
 - **En el chat (tú o tus mods):** `!pausa` y `!reanudar`.
@@ -117,15 +142,18 @@ Al pausar se descartan las acciones pendientes de la cola.
 src/
   index.js              arranque
   config.js             lee .env
-  server.js             panel local y endpoints de control
+  server.js             API del panel (/api) y servidor del panel compilado
   auth/twitchAuth.js    login OAuth con Twitch y renovación del token
   adapters/twitch.js    EventSub → eventos normalizados
   core/eventBus.js      cola, pausa y despacho de eventos
   core/rulesEngine.js   coincidencia de reglas, cooldowns y variables
+  core/rulesStore.js    lectura/escritura validada de rules.json
+  core/logger.js        logs en terminal + historial para el panel
   actions/minecraft.js  RCON con reconexión automática
   actions/chat.js       respuestas en el chat
 config/rules.json       tus reglas
 scripts/simular.js      simulador de eventos
+panel/                  panel de control (React + Vite)
 ```
 
 Para agregar otra plataforma, crea `src/adapters/kick.js` que llame a `bus.emit({...})` con el mismo formato que usa `twitch.js`.

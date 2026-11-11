@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "simular": "node scripts/simular.js"
+    "simular": "node scripts/simular.js",
+    "panel:install": "npm --prefix panel install",
+    "panel:dev": "npm --prefix panel run dev",
+    "panel:build": "npm --prefix panel run build"
   },
   "engines": {
     "node": ">=20"

@@ -81,6 +81,7 @@ export async function startTwitch({ authProvider, userId, bus }) {
   log.info('🟣 Escuchando recompensas, comandos y bits de Twitch');
 
   return {
+    displayName: me.displayName,
     sendChat: (text) => apiClient.chat.sendChatMessage(userId, text).catch((err) =>
       log.warn('No se pudo enviar mensaje al chat:', err.message)),
     /** Crea una recompensa propiedad de esta app (así se puede completar/reembolsar). */
@@ -88,6 +89,21 @@ export async function startTwitch({ authProvider, userId, bus }) {
       const reward = await apiClient.channelPoints.createCustomReward(userId, data);
       manageable.add(reward.id);
       return reward;
+    },
+    /** Todas las recompensas del canal, marcando cuáles puede administrar la app. */
+    listRewards: async () => {
+      const rewards = await apiClient.channelPoints.getCustomRewards(userId, false);
+      return rewards.map((r) => ({
+        id: r.id,
+        title: r.title,
+        cost: r.cost,
+        prompt: r.prompt,
+        enabled: r.isEnabled,
+        paused: r.isPaused,
+        userInputRequired: r.userInputRequired,
+        globalCooldown: r.globalCooldown,
+        managedByApp: manageable.has(r.id)
+      }));
     },
     stop: () => listener.stop()
   };

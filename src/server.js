@@ -1,46 +1,120 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import express from 'express';
+import { log } from './core/logger.js';
 
 /**
- * Servidor local: login de Twitch + endpoints de control.
+ * Servidor local: login de Twitch, API del panel y el panel ya compilado.
  * Solo escucha en localhost, no queda expuesto a internet.
  */
 export function createServer() {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '1mb' }));
   return app;
 }
 
-export function registerControlRoutes(app, { bus, simulate, getTwitch }) {
-  app.get('/', (_req, res) => {
-    res.type('html').send(`
-      <h2>stream-interact</h2>
-      <p>Estado: <code>${JSON.stringify(bus.status())}</code></p>
-      <p><a href="/pausa">⏸️ Pausar</a> · <a href="/reanudar">▶️ Reanudar</a></p>
-      <p>Simular: <code>POST /simular</code> con JSON {"type":"reward","name":"...","user":"...","amount":0,"input":""}</p>`);
+/** Envuelve handlers async para que los errores respondan JSON en vez de tumbar el servidor. */
+const route = (fn) => async (req, res) => {
+  try {
+    const result = await fn(req, res);
+    if (!res.headersSent) res.json(result ?? { ok: true });
+  } catch (err) {
+    res.status(err.status ?? 500).json({ error: err.message });
+  }
+};
+
+export function registerApiRoutes(app, { bus, engine, store, simulate, mc, getTwitch, config }) {
+  // --- Estado general ---
+  app.get('/api/estado', route(() => {
+    const twitch = getTwitch();
+    return {
+      ...bus.status(),
+      twitch: twitch ? { connected: true, user: twitch.displayName } : { connected: false, loginUrl: '/auth/login' },
+      minecraft: { connected: mc.connected, host: `${config.minecraft.host}:${config.minecraft.port}`, player: config.minecraft.player },
+      rules: engine.rules.length
+    };
+  }));
+
+  app.post('/api/pausa', route(() => { bus.pause(); return bus.status(); }));
+  app.post('/api/reanudar', route(() => { bus.resume(); return bus.status(); }));
+
+  // --- Feed en vivo (Server-Sent Events) ---
+  app.get('/api/feed', (req, res) => {
+    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    res.flushHeaders();
+    const send = (entry) => res.write(`data: ${JSON.stringify(entry)}\n\n`);
+    log.history().slice(-100).forEach(send);
+    const unsubscribe = log.subscribe(send);
+    const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+    req.on('close', () => { unsubscribe(); clearInterval(ping); });
   });
+
+  // --- Reglas ---
+  app.get('/api/reglas', route(() => {
+    const data = store.read();
+    return { settings: data.settings ?? {}, rules: data.rules ?? [], actionTypes: store.actionTypes };
+  }));
+
+  app.put('/api/reglas', route((req) => {
+    const saved = store.write(req.body ?? {});
+    engine.load(); // aplicar al instante, sin esperar a que se detecte el cambio del archivo
+    log.info(`💾 Reglas guardadas desde el panel (${saved.rules.length})`);
+    return { settings: saved.settings, rules: saved.rules };
+  }));
+
+  // --- Pruebas ---
+  app.post('/api/simular', route((req) => {
+    simulate(req.body ?? {});
+  }));
+
+  app.post('/api/minecraft/conectar', route(async () => {
+    await mc.tryConnect();
+    return { connected: mc.connected };
+  }));
+
+  app.post('/api/minecraft/comando', route(async (req) => {
+    const command = String(req.body?.command ?? '').trim().replace(/^\//, '');
+    if (!command) throw Object.assign(new Error('Escribe un comando'), { status: 400 });
+    const response = await mc.send(command);
+    log.action(`/${command}${response ? `  →  ${response}` : ''} (desde el panel)`);
+    return { response };
+  }));
+
+  // --- Recompensas de Twitch ---
+  app.get('/api/twitch/recompensas', route(async () => {
+    const twitch = getTwitch();
+    if (!twitch) throw Object.assign(new Error('Twitch no está conectado'), { status: 409 });
+    return twitch.listRewards();
+  }));
+
+  app.post('/api/twitch/recompensas', route(async (req) => {
+    const twitch = getTwitch();
+    if (!twitch) throw Object.assign(new Error('Twitch no está conectado'), { status: 409 });
+    const { title, cost, prompt, userInputRequired = false, globalCooldown } = req.body ?? {};
+    if (!title || !(cost > 0)) throw Object.assign(new Error('Pon un título y un costo mayor a 0'), { status: 400 });
+    const reward = await twitch.createReward({
+      title, cost: Number(cost), prompt, userInputRequired,
+      globalCooldown: globalCooldown ? Number(globalCooldown) : null
+    });
+    log.info(`🎁 Recompensa creada en Twitch: "${reward.title}" (${reward.cost} puntos)`);
+    return { id: reward.id, title: reward.title, cost: reward.cost };
+  }));
+
+  // --- Compatibilidad con los enlaces anteriores ---
   app.get('/pausa', (_req, res) => { bus.pause(); res.redirect('/'); });
   app.get('/reanudar', (_req, res) => { bus.resume(); res.redirect('/'); });
-  app.get('/estado', (_req, res) => res.json(bus.status()));
+  app.post('/simular', (req, res) => { simulate(req.body ?? {}); res.json({ ok: true }); });
+}
 
-  // Simula un evento sin estar en directo (útil para probar reglas)
-  app.post('/simular', (req, res) => {
-    simulate(req.body ?? {});
-    res.json({ ok: true });
-  });
-
-  // Crea una recompensa de Twitch propiedad de esta app
-  app.post('/twitch/recompensas', async (req, res) => {
-    const twitch = getTwitch();
-    if (!twitch) return res.status(400).json({ error: 'Twitch no está conectado' });
-    try {
-      const { title, cost, prompt, userInputRequired = false, globalCooldown } = req.body ?? {};
-      const reward = await twitch.createReward({
-        title, cost, prompt, userInputRequired,
-        globalCooldown: globalCooldown ?? null
-      });
-      res.json({ id: reward.id, title: reward.title, cost: reward.cost });
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  });
+/** Sirve el panel compilado (panel/dist). Se registra al final, después de /api y /auth. */
+export function servePanel(app) {
+  const dist = path.resolve('panel', 'dist');
+  if (!fs.existsSync(path.join(dist, 'index.html'))) {
+    app.get('/', (_req, res) => res.type('html').send(
+      '<h2>stream-interact</h2><p>El panel no está compilado. Ejecuta <code>npm run panel:build</code> ' +
+      'o, para desarrollo, <code>npm run panel:dev</code> y abre <a href="http://localhost:5173">localhost:5173</a>.</p>'));
+    return;
+  }
+  app.use(express.static(dist));
+  app.get(/^\/(?!api\/|auth\/).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
 }

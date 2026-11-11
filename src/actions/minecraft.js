@@ -29,6 +29,10 @@ export class MinecraftRcon {
     return this.connecting;
   }
 
+  get connected() {
+    return Boolean(this.rcon?.authenticated);
+  }
+
   async send(command) {
     const rcon = await this.#connection();
     return rcon.send(command);
@@ -47,7 +51,8 @@ export class MinecraftRcon {
 export function minecraftAction(mc) {
   return async (action, vars) => {
     for (const template of action.commands ?? []) {
-      const command = fill(template, vars).replace(/^\//, '');
+      const command = fill(template, vars).trim().replace(/^\//, '');
+      if (!command) continue;
       const response = await mc.send(command);
       log.action(`/${command}${response ? `  →  ${response}` : ''}`);
     }
