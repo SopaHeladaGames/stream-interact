@@ -20,12 +20,24 @@ export const api = {
   conectarMinecraft: () => request('POST', '/api/minecraft/conectar'),
   comandoMinecraft: (command) => request('POST', '/api/minecraft/comando', { command }),
   recompensas: () => request('GET', '/api/twitch/recompensas'),
-  crearRecompensa: (data) => request('POST', '/api/twitch/recompensas', data)
+  crearRecompensa: (data) => request('POST', '/api/twitch/recompensas', data),
+  servidor: () => request('GET', '/api/servidor'),
+  iniciarServidor: () => request('POST', '/api/servidor/iniciar'),
+  detenerServidor: () => request('POST', '/api/servidor/detener'),
+  reiniciarServidor: () => request('POST', '/api/servidor/reiniciar'),
+  comandoServidor: (command) => request('POST', '/api/servidor/comando', { command })
 };
 
 /** Se suscribe al feed en vivo. Devuelve una función para cerrar la conexión. */
 export function subscribeFeed(onEntry) {
   const source = new EventSource('/api/feed');
   source.onmessage = (e) => onEntry(JSON.parse(e.data));
+  return () => source.close();
+}
+
+/** Consola del servidor de Minecraft en vivo. */
+export function subscribeConsole(onLine) {
+  const source = new EventSource('/api/servidor/consola');
+  source.onmessage = (e) => onLine(JSON.parse(e.data));
   return () => source.close();
 }

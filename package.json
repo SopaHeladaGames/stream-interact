@@ -3,14 +3,16 @@
   "version": "0.1.0",
   "description": "Permite que el chat de tus directos (Twitch, luego Kick/YouTube) interactúe con tu juego.",
   "type": "module",
-  "main": "src/index.js",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "simular": "node scripts/simular.js",
     "panel:install": "npm --prefix panel install",
     "panel:dev": "npm --prefix panel run dev",
-    "panel:build": "npm --prefix panel run build"
+    "panel:build": "npm --prefix panel run build",
+    "desktop": "electron .",
+    "desktop:dev": "electron . --dev"
   },
   "engines": {
     "node": ">=20"
@@ -22,5 +24,8 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "rcon-client": "^4.2.5"
+  },
+  "devDependencies": {
+    "electron": "^45.3.0"
   }
 }

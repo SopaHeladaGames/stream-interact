@@ -29,5 +29,14 @@ export const config = {
     password: required('MC_RCON_PASSWORD'),
     player: required('MC_PLAYER')
   },
+  // Servidor de Minecraft controlado por la app (opcional)
+  mcServer: {
+    dir: process.env.MC_SERVER_DIR || null,
+    java: process.env.MC_JAVA || 'java',
+    memoryMin: process.env.MC_MEMORY_MIN || '2G',
+    memoryMax: process.env.MC_MEMORY_MAX || '4G',
+    autoRestart: (process.env.MC_AUTO_RESTART ?? 'true') === 'true',
+    autoStart: (process.env.MC_SERVER_AUTOSTART ?? 'false') === 'true'
+  },
   chatReplies: (process.env.CHAT_REPLIES ?? 'true') === 'true'
 };

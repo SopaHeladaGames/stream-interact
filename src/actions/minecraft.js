@@ -38,12 +38,18 @@ export class MinecraftRcon {
     return rcon.send(command);
   }
 
-  async tryConnect() {
+  async tryConnect({ quiet = false } = {}) {
     try {
       await this.#connection();
     } catch (err) {
-      log.warn(`No se pudo conectar a Minecraft todavía (${err.message}). Se reintentará al llegar el primer evento.`);
+      if (!quiet) log.warn(`No se pudo conectar a Minecraft todavía (${err.message}). Se reintentará al llegar el primer evento.`);
     }
+    return this.connected;
+  }
+
+  close() {
+    this.rcon?.end().catch(() => {});
+    this.rcon = null;
   }
 }
 

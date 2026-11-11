@@ -4,11 +4,13 @@ import Inicio from './pages/Inicio.jsx';
 import Reglas from './pages/Reglas.jsx';
 import Probar from './pages/Probar.jsx';
 import Recompensas from './pages/Recompensas.jsx';
+import Servidor from './pages/Servidor.jsx';
 
 const PAGES = [
   { id: 'inicio', label: 'Inicio', icon: '◉' },
   { id: 'reglas', label: 'Reglas', icon: '⚙' },
   { id: 'probar', label: 'Probar', icon: '▶' },
+  { id: 'servidor', label: 'Servidor', icon: '▣' },
   { id: 'recompensas', label: 'Recompensas', icon: '★' }
 ];
 
@@ -68,6 +70,7 @@ export default function App() {
         {page === 'inicio' && <Inicio estado={estado} />}
         {page === 'reglas' && <Reglas />}
         {page === 'probar' && <Probar />}
+        {page === 'servidor' && <Servidor />}
         {page === 'recompensas' && <Recompensas conectado={estado?.twitch?.connected} />}
       </main>
     </div>

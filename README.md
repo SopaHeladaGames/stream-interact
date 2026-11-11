@@ -128,6 +128,44 @@ npm run panel:dev    # panel en http://localhost:5173 (redirige /api al backend)
 
 El botón **Pausar todo** de la barra lateral equivale a `!pausa`.
 
+## App de escritorio (Electron)
+
+En lugar de `npm start` y el navegador, puedes abrir todo como un programa:
+
+```bash
+npm install          # solo la primera vez, instala Electron
+npm run panel:build  # si no lo has compilado
+npm run desktop
+```
+
+O haz **doble clic en `iniciar.vbs`**, que abre la app sin dejar una terminal abierta.
+
+**Qué incluye:**
+- **Ventana propia:** al cerrarla, la app sigue funcionando en la **bandeja del sistema**, junto al reloj. Para salir del todo: clic derecho en el ícono → *Salir*.
+- **Atajo global de pánico** (`Ctrl+Shift+P`): pausa o reanuda las interacciones aunque estés dentro de Minecraft, con una notificación de Windows. Se cambia con `PANIC_SHORTCUT` en el `.env`.
+- **Ícono de la bandeja en rojo** mientras está en pausa, con un menú rápido para pausar y para iniciar o detener el servidor.
+- **Notificación** si el servidor de Minecraft se cae.
+- **El login de Twitch** se abre en tu navegador normal.
+- **Al salir**, apaga el servidor de Minecraft guardando el mundo.
+
+**Para desarrollar el panel con recarga en caliente** dentro de la app: ejecuta `npm run panel:dev` en una terminal y `npm run desktop:dev` en otra.
+
+## Servidor de Minecraft desde la app
+
+Agrega a tu `.env`:
+```env
+MC_SERVER_DIR=C:\Users\vitro\dev\mc-server
+```
+Con eso, en la página **Servidor** del panel puedes:
+- iniciarlo, detenerlo y reiniciarlo;
+- ver la consola en vivo y escribir comandos (con ↑ y ↓ recorres los anteriores).
+
+Si se cae, se reinicia solo en 10 segundos. Para evitar un ciclo de reinicios, se detiene después de 3 caídas en 5 minutos.
+
+Con `MC_SERVER_AUTOSTART=true`, el servidor arranca junto con la app.
+
+> Si el servidor ya está corriendo con `start.bat`, la app lo detecta como "fuera de la app": puede mandarle comandos por RCON, pero no ver su consola. Para controlarlo desde el panel, ciérralo con `stop` y arráncalo desde la app.
+
 ## 6. Botón de pánico
 
 - **En el chat (tú o tus mods):** `!pausa` y `!reanudar`.
@@ -139,8 +177,12 @@ Al pausar se descartan las acciones pendientes de la cola.
 ## Estructura
 
 ```
+electron/main.js        app de escritorio (ventana, bandeja, atajo global)
+iniciar.vbs             abre la app de escritorio sin terminal
 src/
-  index.js              arranque
+  index.js              arranque desde la terminal (npm start)
+  app.js                arranque del backend (lo usan npm start y Electron)
+  minecraftServer.js    iniciar/detener el servidor de Minecraft y su consola
   config.js             lee .env
   server.js             API del panel (/api) y servidor del panel compilado
   auth/twitchAuth.js    login OAuth con Twitch y renovación del token

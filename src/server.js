@@ -23,7 +23,7 @@ const route = (fn) => async (req, res) => {
   }
 };
 
-export function registerApiRoutes(app, { bus, engine, store, simulate, mc, getTwitch, config }) {
+export function registerApiRoutes(app, { bus, engine, store, simulate, mc, mcServer, getTwitch, config }) {
   // --- Estado general ---
   app.get('/api/estado', route(() => {
     const twitch = getTwitch();
@@ -31,6 +31,7 @@ export function registerApiRoutes(app, { bus, engine, store, simulate, mc, getTw
       ...bus.status(),
       twitch: twitch ? { connected: true, user: twitch.displayName } : { connected: false, loginUrl: '/auth/login' },
       minecraft: { connected: mc.connected, host: `${config.minecraft.host}:${config.minecraft.port}`, player: config.minecraft.player },
+      server: mcServer?.status() ?? null,
       rules: engine.rules.length
     };
   }));
@@ -104,6 +105,35 @@ export function registerApiRoutes(app, { bus, engine, store, simulate, mc, getTw
   app.get('/pausa', (_req, res) => { bus.pause(); res.redirect('/'); });
   app.get('/reanudar', (_req, res) => { bus.resume(); res.redirect('/'); });
   app.post('/simular', (req, res) => { simulate(req.body ?? {}); res.json({ ok: true }); });
+}
+
+/** Control del servidor de Minecraft desde el panel. */
+export function registerServerRoutes(app, { mcServer, mc }) {
+  app.get('/api/servidor', route(() => ({ ...mcServer.status(), rcon: mc.connected })));
+
+  app.post('/api/servidor/iniciar', route(() => { mcServer.start(); return mcServer.status(); }));
+  app.post('/api/servidor/detener', route(async () => { await mcServer.stop(); return mcServer.status(); }));
+  app.post('/api/servidor/reiniciar', route(async () => { await mcServer.restart(); return mcServer.status(); }));
+
+  // Si la app arrancó el servidor, el comando va por su consola; si no, por RCON
+  app.post('/api/servidor/comando', route(async (req) => {
+    const command = String(req.body?.command ?? '');
+    if (mcServer.proc) { mcServer.send(command); return { via: 'consola' }; }
+    const clean = command.trim().replace(/^\//, '');
+    if (!clean) throw Object.assign(new Error('Escribe un comando'), { status: 400 });
+    const response = await mc.send(clean);
+    return { via: 'rcon', response };
+  }));
+
+  app.get('/api/servidor/consola', (req, res) => {
+    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    res.flushHeaders();
+    const send = (entry) => res.write(`data: ${JSON.stringify(entry)}\n\n`);
+    mcServer.history().slice(-300).forEach(send);
+    const unsubscribe = mcServer.subscribe(send);
+    const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+    req.on('close', () => { unsubscribe(); clearInterval(ping); });
+  });
 }
 
 /** Sirve el panel compilado (panel/dist). Se registra al final, después de /api y /auth. */

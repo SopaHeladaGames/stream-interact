@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, subscribeFeed } from '../api.js';
 
 const LEVEL_LABEL = { event: 'Evento', action: 'Acción', warn: 'Aviso', error: 'Error', info: 'Info' };
+const SERVER_LABEL = { stopped: 'Detenido', starting: 'Iniciando…', running: 'En línea (desde la app)', stopping: 'Deteniendo…', crashed: 'Se cayó', external: 'En línea (fuera de la app)' };
 const FILTERS = [
   { id: 'todo', label: 'Todo' },
   { id: 'event', label: 'Eventos' },
@@ -43,6 +44,12 @@ export default function Inicio({ estado }) {
           ok={mc?.connected}
           detail={mc ? `${mc.connected ? 'RCON conectado' : 'Sin conexión'} · ${mc.host}` : '…'}
           action={!mc?.connected && <button className="btn small" onClick={() => api.conectarMinecraft().catch(() => {})}>Reconectar</button>}
+        />
+        <StatusCard
+          title="Servidor"
+          ok={['running', 'external'].includes(estado?.server?.state)}
+          warn={['starting', 'stopping'].includes(estado?.server?.state)}
+          detail={SERVER_LABEL[estado?.server?.state] ?? '…'}
         />
         <StatusCard
           title="Interacciones"

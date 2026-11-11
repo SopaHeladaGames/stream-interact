@@ -177,10 +177,35 @@
       ]
     },
     {
+      "id": "skeleton",
+      "trigger": {
+        "type": "command",
+        "name": "!esqueleto"
+      },
+      "cooldownMs": 3000,
+      "actions": [
+        {
+          "type": "minecraft",
+          "commands": [
+            "execute at {player} run summon minecraft:skeleton ~3 ~ ~3"
+          ]
+        },
+        {
+          "type": "announce",
+          "text": "{user} envió un esqueleto",
+          "color": "yellow"
+        },
+        {
+          "type": "chat",
+          "message": "{user} le envió un esqueleto al sopa"
+        }
+      ]
+    },
+    {
       "id": "bits-grandes",
       "trigger": {
         "type": "cheer",
-        "minAmount": 500
+        "minAmount": 100
       },
       "actions": [
         {
@@ -223,31 +248,6 @@
         {
           "type": "chat",
           "message": "💎 ¡Gracias {user} por {amount} bits!"
-        }
-      ]
-    },
-    {
-      "id": "regla-1",
-      "trigger": {
-        "type": "command",
-        "name": "!esqueleto"
-      },
-      "cooldownMs": 3000,
-      "actions": [
-        {
-          "type": "minecraft",
-          "commands": [
-            "execute at {player} run summon minecraft:skeleton ~3 ~ ~3"
-          ]
-        },
-        {
-          "type": "announce",
-          "text": "{user} envió un esqueleto",
-          "color": "yellow"
-        },
-        {
-          "type": "chat",
-          "message": "{user} le envió un esqueleto al sopa"
         }
       ]
     }
