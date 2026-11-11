@@ -20,6 +20,12 @@ export async function startTwitch({ authProvider, userId, bus }) {
     log.warn('No se pudieron leer las recompensas (¿tu cuenta es afiliado/partner?):', err.message);
   }
 
+  const assertManageable = (rewardId) => {
+    if (!manageable.has(rewardId)) {
+      throw Object.assign(new Error('Twitch solo permite modificar recompensas creadas por esta app. Esta se creó en el panel de Twitch.'), { status: 403 });
+    }
+  };
+
   const listener = new EventSubWsListener({ apiClient });
 
   // 1) Canje de recompensas de puntos de canal
@@ -86,9 +92,11 @@ export async function startTwitch({ authProvider, userId, bus }) {
       log.warn('No se pudo enviar mensaje al chat:', err.message)),
     /** Crea una recompensa propiedad de esta app (así se puede completar/reembolsar). */
     createReward: async (data) => {
-      const reward = await apiClient.channelPoints.createCustomReward(userId, data);
-      manageable.add(reward.id);
-      return reward;
+      try {
+        const reward = await apiClient.channelPoints.createCustomReward(userId, data);
+        manageable.add(reward.id);
+        return reward;
+      } catch (err) { throw friendlyError(err); }
     },
     /** Todas las recompensas del canal, marcando cuáles puede administrar la app. */
     listRewards: async () => {
@@ -102,9 +110,42 @@ export async function startTwitch({ authProvider, userId, bus }) {
         paused: r.isPaused,
         userInputRequired: r.userInputRequired,
         globalCooldown: r.globalCooldown,
+        backgroundColor: r.backgroundColor,
         managedByApp: manageable.has(r.id)
       }));
     },
+    /** Cambia una recompensa de la app (activar, pausar, editar). */
+    updateReward: async (rewardId, patch) => {
+      assertManageable(rewardId);
+      const allowed = ['title', 'cost', 'prompt', 'isEnabled', 'isPaused', 'userInputRequired', 'globalCooldown', 'backgroundColor'];
+      const data = Object.fromEntries(Object.entries(patch).filter(([k]) => allowed.includes(k)));
+      try {
+        const r = await apiClient.channelPoints.updateCustomReward(userId, rewardId, data);
+        return { id: r.id, title: r.title, cost: r.cost, enabled: r.isEnabled, paused: r.isPaused };
+      } catch (err) { throw friendlyError(err); }
+    },
+    /** Elimina una recompensa de la app. */
+    deleteReward: async (rewardId) => {
+      assertManageable(rewardId);
+      try {
+        await apiClient.channelPoints.deleteCustomReward(userId, rewardId);
+        manageable.delete(rewardId);
+      } catch (err) { throw friendlyError(err); }
+    },
     stop: () => listener.stop()
   };
+}
+
+/** Traduce los errores más comunes de la API de Twitch a algo entendible. */
+function friendlyError(err) {
+  const body = String(err.body ?? err.message ?? '');
+  const status = err.statusCode ?? 500;
+  let message = err.message;
+  if (/DUPLICATE_REWARD|duplicate/i.test(body)) message = 'Ya existe una recompensa con ese título en tu canal. Los títulos deben ser únicos.';
+  else if (status === 403) message = 'Twitch rechazó el cambio: solo se pueden modificar recompensas creadas por esta app.';
+  else if (status === 404) message = 'Esa recompensa ya no existe en Twitch.';
+  else if (status === 400) {
+    try { message = `Twitch rechazó los datos: ${JSON.parse(body).message}`; } catch { /* usar el mensaje original */ }
+  }
+  return Object.assign(new Error(message), { status: status >= 400 && status < 500 ? status : 502 });
 }

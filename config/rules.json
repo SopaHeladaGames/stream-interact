@@ -250,6 +250,48 @@
           "message": "💎 ¡Gracias {user} por {amount} bits!"
         }
       ]
+    },
+    {
+      "id": "regla-1",
+      "trigger": {
+        "type": "command",
+        "name": "!hambre"
+      },
+      "cooldownMs": 0,
+      "actions": [
+        {
+          "type": "announce",
+          "text": "{user} le dio hambre al sopa",
+          "color": "yellow"
+        },
+        {
+          "type": "minecraft",
+          "commands": [
+            "effect give {player} minecraft:hunger 300 1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "regla-2",
+      "trigger": {
+        "type": "reward",
+        "name": "Madera"
+      },
+      "cooldownMs": 30000,
+      "actions": [
+        {
+          "type": "announce",
+          "text": "{user} envió un refuerzo de madera",
+          "color": "white"
+        },
+        {
+          "type": "minecraft",
+          "commands": [
+            "give {player} minecraft:oak_log 64"
+          ]
+        }
+      ]
     }
   ]
 }

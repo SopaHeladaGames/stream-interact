@@ -91,14 +91,37 @@ export function registerApiRoutes(app, { bus, engine, store, simulate, mc, mcSer
   app.post('/api/twitch/recompensas', route(async (req) => {
     const twitch = getTwitch();
     if (!twitch) throw Object.assign(new Error('Twitch no está conectado'), { status: 409 });
-    const { title, cost, prompt, userInputRequired = false, globalCooldown } = req.body ?? {};
+    const { title, cost, prompt, userInputRequired = false, globalCooldown, backgroundColor } = req.body ?? {};
     if (!title || !(cost > 0)) throw Object.assign(new Error('Pon un título y un costo mayor a 0'), { status: 400 });
     const reward = await twitch.createReward({
       title, cost: Number(cost), prompt, userInputRequired,
-      globalCooldown: globalCooldown ? Number(globalCooldown) : null
+      globalCooldown: globalCooldown ? Number(globalCooldown) : null,
+      ...(backgroundColor ? { backgroundColor } : {})
     });
     log.info(`🎁 Recompensa creada en Twitch: "${reward.title}" (${reward.cost} puntos)`);
     return { id: reward.id, title: reward.title, cost: reward.cost };
+  }));
+
+  app.patch('/api/twitch/recompensas/:id', route(async (req) => {
+    const twitch = getTwitch();
+    if (!twitch) throw Object.assign(new Error('Twitch no está conectado'), { status: 409 });
+    const body = req.body ?? {};
+    if (body.cost != null && !(Number(body.cost) > 0)) throw Object.assign(new Error('El costo debe ser mayor a 0'), { status: 400 });
+    const patch = { ...body };
+    if (patch.cost != null) patch.cost = Number(patch.cost);
+    if ('globalCooldown' in patch) patch.globalCooldown = patch.globalCooldown ? Number(patch.globalCooldown) : null;
+    const reward = await twitch.updateReward(req.params.id, patch);
+    const what = 'isEnabled' in body ? (body.isEnabled ? 'activada' : 'desactivada')
+      : 'isPaused' in body ? (body.isPaused ? 'pausada' : 'reanudada') : 'actualizada';
+    log.info(`🎁 Recompensa "${reward.title}" ${what}`);
+    return reward;
+  }));
+
+  app.delete('/api/twitch/recompensas/:id', route(async (req) => {
+    const twitch = getTwitch();
+    if (!twitch) throw Object.assign(new Error('Twitch no está conectado'), { status: 409 });
+    await twitch.deleteReward(req.params.id);
+    log.info('🗑️ Recompensa eliminada de Twitch');
   }));
 
   // --- Compatibilidad con los enlaces anteriores ---
