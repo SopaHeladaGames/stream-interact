@@ -1,0 +1,23 @@
+{
+  "name": "stream-interact",
+  "version": "0.1.0",
+  "description": "Permite que el chat de tus directos (Twitch, luego Kick/YouTube) interactúe con tu juego.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "simular": "node scripts/simular.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@twurple/api": "^8.2.0",
+    "@twurple/auth": "^8.2.0",
+    "@twurple/eventsub-ws": "^8.2.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "rcon-client": "^4.2.5"
+  }
+}

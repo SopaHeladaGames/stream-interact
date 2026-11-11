@@ -1,0 +1,101 @@
+{
+  "_ayuda": "Triggers: reward | command | cheer. Acciones: minecraft (comandos sin '/'), announce (mensaje con color en Minecraft), title (texto grande en pantalla), chat (responder en Twitch), wait (pausa en ms). Variables: {player} {user} {input} {amount} {platform}. Colores: black, dark_blue, dark_green, dark_aqua, dark_red, dark_purple, gold, gray, dark_gray, blue, green, aqua, red, light_purple, yellow, white. Guarda y se recarga solo.",
+  "settings": {
+    "cooldownReplies": true,
+    "helpCommand": "!comandos",
+    "helpCooldownMs": 30000
+  },
+  "rules": [
+    {
+      "id": "zombie",
+      "trigger": { "type": "reward", "name": "Invocar zombie" },
+      "cooldownMs": 10000,
+      "actions": [
+        { "type": "minecraft", "commands": ["execute at {player} run summon minecraft:zombie ~3 ~ ~3"] },
+        { "type": "announce", "text": "{user} te mandó un zombie", "color": "green" },
+        { "type": "chat", "message": "🧟 {user} invocó un zombie a {player}" }
+      ]
+    },
+    {
+      "id": "creeper",
+      "trigger": { "type": "reward", "name": "Creeper sorpresa" },
+      "cooldownMs": 60000,
+      "actions": [
+        { "type": "title", "title": "¡Cuidado!", "subtitle": "{user} te mandó un creeper", "color": "red" },
+        { "type": "wait", "ms": 1500 },
+        { "type": "minecraft", "commands": ["execute at {player} run summon minecraft:creeper ~-2 ~ ~-2"] },
+        { "type": "chat", "message": "💥 {user} soltó un creeper junto a {player}" }
+      ]
+    },
+    {
+      "id": "regalo",
+      "trigger": { "type": "reward", "name": "Regalar comida" },
+      "cooldownMs": 5000,
+      "actions": [
+        { "type": "minecraft", "commands": ["give {player} minecraft:cooked_beef 8"] },
+        { "type": "announce", "text": "{user} te regaló comida", "color": "gold" }
+      ]
+    },
+    {
+      "id": "zombie-cmd",
+      "trigger": { "type": "command", "name": "!zombie" },
+      "cooldownMs": 30000,
+      "userCooldownMs": 120000,
+      "actions": [
+        { "type": "minecraft", "commands": ["execute at {player} run summon minecraft:zombie ~3 ~ ~3"] },
+        { "type": "announce", "text": "{user} te mandó un zombie", "color": "green" }
+      ]
+    },
+    {
+      "id": "lluvia",
+      "trigger": { "type": "command", "name": "!lluvia" },
+      "cooldownMs": 120000,
+      "userCooldownMs": 300000,
+      "actions": [
+        { "type": "minecraft", "commands": ["weather thunder 60s"] },
+        { "type": "announce", "text": "{user} invocó una tormenta", "color": "aqua" },
+        { "type": "chat", "message": "⛈️ {user} invocó una tormenta de 60s" }
+      ]
+    },
+    {
+      "id": "velocidad",
+      "trigger": { "type": "command", "name": "!rapido" },
+      "cooldownMs": 60000,
+      "actions": [
+        { "type": "minecraft", "commands": ["effect give {player} minecraft:speed 20 2"] },
+        { "type": "announce", "text": "{user} te dio velocidad por 20s", "color": "yellow" },
+        { "type": "chat", "message": "⚡ {user} le dio velocidad a {player} por 20s" }
+      ]
+    },
+    {
+      "id": "salto",
+      "trigger": { "type": "command", "name": "!salto" },
+      "cooldownMs": 60000,
+      "actions": [
+        { "type": "minecraft", "commands": ["effect give {player} minecraft:jump_boost 20 3"] },
+        { "type": "announce", "text": "{user} te dio súper salto por 20s", "color": "light_purple" }
+      ]
+    },
+    {
+      "id": "bits-grandes",
+      "trigger": { "type": "cheer", "minAmount": 500 },
+      "actions": [
+        { "type": "title", "title": "¡REFUERZOS!", "subtitle": "{user} donó {amount} bits", "color": "dark_red" },
+        { "type": "minecraft", "commands": [
+          "execute at {player} run summon minecraft:wither_skeleton ~4 ~ ~",
+          "execute at {player} run summon minecraft:wither_skeleton ~-4 ~ ~"
+        ]},
+        { "type": "chat", "message": "💀 ¡Gracias {user} por {amount} bits! Refuerzos en camino" }
+      ]
+    },
+    {
+      "id": "bits-chicos",
+      "trigger": { "type": "cheer", "minAmount": 100 },
+      "actions": [
+        { "type": "minecraft", "commands": ["give {player} minecraft:diamond 1"] },
+        { "type": "announce", "text": "¡Gracias {user} por {amount} bits!", "color": "aqua" },
+        { "type": "chat", "message": "💎 ¡Gracias {user} por {amount} bits!" }
+      ]
+    }
+  ]
+}
