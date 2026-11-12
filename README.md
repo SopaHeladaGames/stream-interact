@@ -198,6 +198,48 @@ En las reglas, `{user}` vale "El modo caos".
 
 Las votaciones y la configuración del modo caos se guardan en `config/juego.json`. Ni las votaciones ni el modo caos revisan los cooldowns de las reglas.
 
+## Overlay para OBS
+
+La app sirve una página con fondo transparente para agregarla en OBS como **fuente de navegador** (1920×1080):
+
+| URL | Qué muestra |
+|-----|-------------|
+| `http://localhost:3000/overlay` | Alertas y votación |
+| `http://localhost:3000/overlay?widget=alertas` | Solo alertas (arriba al centro) |
+| `http://localhost:3000/overlay?widget=votacion` | Solo la votación (abajo a la izquierda) |
+
+- **Alertas:** cada vez que se ejecuta una regla (canje, comando, bits, ganador de una votación o evento del modo caos) aparece una alerta animada, en el mismo orden en que pasan las cosas en el juego. Si llegan varias juntas, salen una tras otra.
+- **Votación:** se ve en vivo con barras, porcentajes y tiempo restante. Al terminar muestra unos segundos el resultado.
+- **Sonido:** cada alerta suena un tono corto, generado por la propia página, sin archivos. Marca *"Controlar audio mediante OBS"* en la fuente para oírlo y ajustarlo. `?sonido=0` en la URL lo apaga solo en esa fuente.
+- **Texto propio:** en el editor de una regla, agrega la acción **Alerta en overlay** con tu texto y color; esa regla usará esa alerta en lugar de la automática.
+- **Página "Overlay OBS" del panel:** las URLs para copiar, una **vista previa en vivo** y el editor de apariencia. Cada cambio se guarda solo y se aplica al instante, también en OBS, sin recargar la fuente.
+
+### Personalizar la apariencia
+
+- **Temas:** Clásico, Neón, Minimal, Pixel y Sin fondo, como punto de partida.
+- **Posición:**
+  - dónde aparecen las alertas y la votación (esquinas, centro, arriba o abajo);
+  - su tamaño;
+  - la separación de los bordes de la pantalla.
+- **Animación:**
+  - entrada: rebote, caída con rebotes, deslizar desde cualquier lado, zoom, voltear o aparecer suave;
+  - salida;
+  - velocidad y tiempo en pantalla;
+  - destello, movimiento del ícono y barra de tiempo.
+- **Estilo:**
+  - tipografía, con 5 fuentes libres incluidas (una pixelada estilo retro); el tamaño y el color del texto;
+  - un color por tipo de alerta;
+  - fondo degradado, sólido o sin fondo, con su opacidad, borde, esquinas redondeadas y resplandor.
+- **Imágenes y sonidos:** sube tus PNG, JPG, GIF o WEBP y tus MP3, OGG o WAV (arrastrándolos o con el botón). Asígnalos por tipo de alerta (canje, bits, comando, votación y caos). La imagen puede ir como ícono o grande arriba del texto.
+
+Los archivos subidos se guardan en la carpeta `media/` del proyecto. Para una imagen o sonido en **una sola regla**, usa la acción *Alerta en overlay* en el editor de esa regla. Ahí también puedes elegir imagen y sonido.
+
+La app tiene que estar abierta para que el overlay funcione. Si OBS se abre antes, el overlay se conecta solo cuando arranca la app.
+
+### Pausar recompensas junto con "Pausar todo"
+
+Al pausar (botón del panel, `!pausa` o `Ctrl+Shift+P`), las recompensas **creadas por la app** también se pausan en Twitch, para que nadie gaste puntos mientras tanto. Al reanudar, la app reanuda solo las que pausó ella. Si cierras la app estando en pausa, las reanuda la próxima vez que la abras. Se desactiva en *Reglas → Ajustes*.
+
 ## Servidor de Minecraft desde la app
 
 Agrega a tu `.env`:
@@ -227,13 +269,17 @@ Al pausar se descartan las acciones pendientes de la cola.
 ```
 electron/main.js        app de escritorio (ventana, bandeja, atajo global)
 iniciar.vbs             abre la app de escritorio sin terminal
+overlay/index.html      overlay para OBS (alertas y votación)
+overlay/fonts/          fuentes libres (OFL) usadas por el overlay
+media/                  tus imágenes y sonidos para las alertas
 src/
   index.js              arranque desde la terminal (npm start)
   app.js                arranque del backend (lo usan npm start y Electron)
   minecraftServer.js    iniciar/detener el servidor de Minecraft y su consola
   game/polls.js         votaciones del chat
   game/chaos.js         modo caos
-  game/gameStore.js     guarda votaciones y modo caos en config/juego.json
+  game/gameStore.js     guarda votaciones, modo caos y overlay en config/juego.json
+  game/overlayConfig.js ajustes de apariencia del overlay (valores por defecto y validación)
   config.js             lee .env
   server.js             API del panel (/api) y servidor del panel compilado
   auth/twitchAuth.js    login OAuth con Twitch y renovación del token
@@ -243,6 +289,8 @@ src/
   core/rulesStore.js    lectura/escritura validada de rules.json
   core/logger.js        logs en terminal + historial para el panel
   core/chatFeed.js      historial del chat en vivo para el panel
+  core/overlayFeed.js   alertas en vivo para el overlay
+  actions/overlay.js    acción "Alerta en overlay" y texto de las alertas automáticas
   actions/minecraft.js  RCON con reconexión automática
   actions/chat.js       respuestas en el chat
 config/rules.json       tus reglas

@@ -17,6 +17,7 @@ export class RulesEngine {
     this.lastRunByUser = new Map(); // `${ruleKey}:${userId}` -> timestamp
     this.warned = new Map();        // `${ruleKey}:${userId}` -> hasta cuándo ya se avisó
     this.lastHelp = 0;
+    this.runListeners = new Set();
     this.load();
     fs.watchFile(rulesPath, { interval: 1000 }, () => this.load());
     bus.onEvent((event) => this.handle(event));
@@ -30,6 +31,7 @@ export class RulesEngine {
         cooldownReplies: true,
         helpCommand: '!comandos',
         helpCooldownMs: 30000,
+        pauseRewards: true,
         ...(data.settings ?? {})
       };
       log.info(`📜 ${this.rules.length} reglas cargadas desde ${this.rulesPath}`);
@@ -94,6 +96,10 @@ export class RulesEngine {
     };
 
     return this.bus.enqueue(ruleKey, async () => {
+      // Avisar (overlay) justo cuando la regla se ejecuta, en el mismo orden que el juego
+      for (const fn of this.runListeners) {
+        try { fn(rule, event, this.ruleLabel(rule.id)); } catch (err) { log.error('Error en aviso de regla:', err.message); }
+      }
       for (const action of rule.actions ?? []) {
         const run = this.actions[action.type];
         if (!run) {
@@ -104,6 +110,11 @@ export class RulesEngine {
       }
       await event.complete?.().catch(() => {});
     });
+  }
+
+  /** Recibe cada regla en el momento en que se ejecuta: fn(rule, event, label). */
+  onRuleRun(fn) {
+    this.runListeners.add(fn);
   }
 
   /** ¿Existe una regla activa con ese id? */

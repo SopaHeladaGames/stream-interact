@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { ApiClient } from '@twurple/api';
 import { EventSubWsListener } from '@twurple/eventsub-ws';
 import { log } from '../core/logger.js';
@@ -179,6 +181,34 @@ export async function startTwitch({ authProvider, userId, bus }) {
         manageable.delete(rewardId);
       } catch (err) { throw friendlyError(err); }
     },
+    /**
+     * Pausa (o reanuda) en Twitch las recompensas de la app que estaban disponibles.
+     * Solo reanuda las que pausó ella misma; las que ya estaban pausadas a mano se quedan así.
+     */
+    setRewardsPaused: async (paused) => {
+      if (paused) {
+        const rewards = await apiClient.channelPoints.getCustomRewards(userId, true);
+        const targets = rewards.filter((r) => r.isEnabled && !r.isPaused);
+        const done = [];
+        for (const r of targets) {
+          try { await apiClient.channelPoints.updateCustomReward(userId, r.id, { isPaused: true }); done.push(r.id); } catch { /* seguir con las demás */ }
+        }
+        savePausedByApp([...new Set([...loadPausedByApp(), ...done])]);
+        if (done.length) log.info(`⏸️  ${done.length} recompensa${done.length === 1 ? '' : 's'} pausada${done.length === 1 ? '' : 's'} en Twitch`);
+        return done.length;
+      }
+      const ids = loadPausedByApp();
+      const pending = [];
+      let count = 0;
+      for (const id of ids) {
+        try { await apiClient.channelPoints.updateCustomReward(userId, id, { isPaused: false }); count++; } catch (err) {
+          if ((err.statusCode ?? 0) !== 404) pending.push(id); // si ya no existe, se olvida
+        }
+      }
+      savePausedByApp(pending);
+      if (count) log.info(`▶️  ${count} recompensa${count === 1 ? '' : 's'} reanudada${count === 1 ? '' : 's'} en Twitch`);
+      return count;
+    },
     stop: () => listener.stop()
   };
 }
@@ -229,4 +259,18 @@ function moderationError(err) {
     message = `Twitch: ${detail}`;
   }
   return Object.assign(new Error(message), { status: status >= 400 && status < 500 ? status : 502 });
+}
+
+// Recompensas que pausó la app (para reanudarlas aunque se cierre a media pausa)
+const PAUSED_FILE = path.resolve('data', 'recompensas-pausadas.json');
+
+function loadPausedByApp() {
+  try { return JSON.parse(fs.readFileSync(PAUSED_FILE, 'utf8')); } catch { return []; }
+}
+
+function savePausedByApp(ids) {
+  try {
+    fs.mkdirSync(path.dirname(PAUSED_FILE), { recursive: true });
+    fs.writeFileSync(PAUSED_FILE, JSON.stringify(ids));
+  } catch { /* no es crítico */ }
 }

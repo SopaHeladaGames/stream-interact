@@ -24,6 +24,18 @@ export class EventBus {
     this.running = false;
     this.paused = false;
     this.handlers = new Set();
+    this.pauseListeners = new Set();
+  }
+
+  /** Avisa cuando se pausa o se reanuda: fn(paused). */
+  onPauseChange(fn) {
+    this.pauseListeners.add(fn);
+  }
+
+  #notifyPause() {
+    for (const fn of this.pauseListeners) {
+      Promise.resolve(fn(this.paused)).catch((err) => log.error('Error al aplicar la pausa:', err.message));
+    }
   }
 
   /** Registra quién procesa los eventos (el motor de reglas). */
@@ -56,15 +68,19 @@ export class EventBus {
   }
 
   pause() {
+    if (this.paused) return;
     this.paused = true;
     const dropped = this.queue.length;
     this.queue = [];
     log.warn(`⏸️  Interacciones en PAUSA (se descartaron ${dropped} pendientes)`);
+    this.#notifyPause();
   }
 
   resume() {
+    if (!this.paused) return;
     this.paused = false;
     log.info('▶️  Interacciones REANUDADAS');
+    this.#notifyPause();
   }
 
   status() {

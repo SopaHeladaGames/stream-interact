@@ -5,13 +5,15 @@ import { RulesEngine } from './core/rulesEngine.js';
 import { RulesStore } from './core/rulesStore.js';
 import { MinecraftRcon, minecraftAction, announceAction, titleAction } from './actions/minecraft.js';
 import { chatAction } from './actions/chat.js';
+import { overlayAction, autoAlert } from './actions/overlay.js';
+import { overlayFeed } from './core/overlayFeed.js';
 import { createTwitchAuth } from './auth/twitchAuth.js';
 import { startTwitch } from './adapters/twitch.js';
 import { MinecraftServer } from './minecraftServer.js';
 import { GameStore } from './game/gameStore.js';
 import { PollManager } from './game/polls.js';
 import { ChaosMode } from './game/chaos.js';
-import { createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, servePanel } from './server.js';
+import { createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, registerOverlayRoutes, servePanel } from './server.js';
 
 /**
  * Arranca todo el backend: reglas, RCON, servidor HTTP + panel y Twitch.
@@ -36,6 +38,7 @@ export async function startApp() {
     announce: announceAction(mc),
     title: titleAction(mc),
     chat: chatAction(chatSenders, config.chatReplies),
+    overlay: overlayAction(),
     wait: async (action) => new Promise((r) => setTimeout(r, action.ms ?? 1000))
   };
   const engine = new RulesEngine({ rulesPath, bus, context: { player: config.minecraft.player }, actions });
@@ -55,6 +58,14 @@ export async function startApp() {
   const polls = new PollManager({ bus, engine, store: gameStore, notify });
   const chaos = new ChaosMode({ bus, engine, store: gameStore, notify, canRun: () => mc.connected });
 
+  // Alerta automática en el overlay cada vez que se ejecuta una regla
+  // (salvo que la regla tenga su propia acción "overlay")
+  engine.onRuleRun((rule, event, label) => {
+    if (!gameStore.overlay.autoAlerts) return;
+    if ((rule.actions ?? []).some((a) => a.type === 'overlay')) return;
+    overlayFeed.alert({ ...autoAlert(event, label), platform: event.platform });
+  });
+
   const simulate = ({ type = 'reward', name = '', user = 'Tester', amount = 0, input = '' }) =>
     bus.emit({
       platform: 'simulado', type, name, amount: Number(amount) || 0, input,
@@ -67,6 +78,7 @@ export async function startApp() {
     getGame: () => ({ poll: polls.summary(), chaos: chaos.summary() })
   });
   registerGameRoutes(app, { polls, chaos, gameStore });
+  registerOverlayRoutes(app, { gameStore });
   registerServerRoutes(app, { mcServer, mc });
 
   // Las rutas /auth/* se registran antes del panel para que este no las tape
@@ -98,6 +110,14 @@ export async function startApp() {
     .then((t) => {
       twitch = t;
       chatSenders.twitch = t.sendChat;
+
+      // Pausar también las recompensas de la app en Twitch cuando se pausa todo
+      bus.onPauseChange((paused) => {
+        if (engine.settings.pauseRewards === false) return;
+        return t.setRewardsPaused(paused);
+      });
+      // Si la app se cerró en pausa, reanudar las recompensas que había pausado
+      if (!bus.paused) t.setRewardsPaused(false).catch(() => {});
       log.info('✅ Todo listo. Usa !pausa / !reanudar en el chat (tú o tus mods) si algo se sale de control.');
       return t;
     })

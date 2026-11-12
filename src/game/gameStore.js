@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { normalizeOverlay, OVERLAY_DEFAULTS } from './overlayConfig.js';
 
 const httpError = (status, message) => Object.assign(new Error(message), { status });
 
@@ -17,7 +18,8 @@ const DEFAULTS = {
       ]
     }
   ],
-  chaos: { minSeconds: 120, maxSeconds: 300, ruleIds: [] }
+  chaos: { minSeconds: 120, maxSeconds: 300, ruleIds: [] },
+  overlay: OVERLAY_DEFAULTS
 };
 
 /** Valida una votación y la devuelve limpia. Lanza un Error con mensaje claro si algo falta. */
@@ -58,6 +60,10 @@ function normalizeChaos(c) {
   return { minSeconds, maxSeconds, ruleIds };
 }
 
+function safeOverlay(o) {
+  try { return normalizeOverlay(o ?? {}); } catch { return structuredClone(OVERLAY_DEFAULTS); }
+}
+
 /**
  * Guarda las votaciones y la configuración del modo caos en config/juego.json
  * (aparte de rules.json, para no mezclar).
@@ -70,6 +76,7 @@ export class GameStore {
 
   get polls() { return this.data.polls; }
   get chaos() { return this.data.chaos; }
+  get overlay() { return this.data.overlay; }
 
   savePolls(polls) {
     if (!Array.isArray(polls)) throw httpError(400, 'Formato inválido');
@@ -84,6 +91,12 @@ export class GameStore {
     return clean;
   }
 
+  saveOverlay(overlay) {
+    this.data.overlay = normalizeOverlay(overlay);
+    this.#write();
+    return this.data.overlay;
+  }
+
   saveChaos(chaos) {
     this.data.chaos = normalizeChaos(chaos);
     this.#write();
@@ -93,7 +106,11 @@ export class GameStore {
   #read() {
     try {
       const d = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      return { polls: Array.isArray(d.polls) ? d.polls : [], chaos: { ...DEFAULTS.chaos, ...(d.chaos ?? {}) } };
+      return {
+        polls: Array.isArray(d.polls) ? d.polls : [],
+        chaos: { ...DEFAULTS.chaos, ...(d.chaos ?? {}) },
+        overlay: safeOverlay(d.overlay)
+      };
     } catch {
       return structuredClone(DEFAULTS);
     }

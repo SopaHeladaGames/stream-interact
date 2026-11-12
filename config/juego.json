@@ -1,0 +1,84 @@
+{
+  "polls": [
+    {
+      "id": "zombie-o-creeper",
+      "question": "¿Zombie o creeper?",
+      "duration": 30,
+      "onNoVotes": "nothing",
+      "options": [
+        {
+          "label": "Zombie",
+          "ruleId": "zombie"
+        },
+        {
+          "label": "Creeper",
+          "ruleId": "creeper"
+        }
+      ]
+    }
+  ],
+  "chaos": {
+    "minSeconds": 120,
+    "maxSeconds": 300,
+    "ruleIds": []
+  },
+  "overlay": {
+    "autoAlerts": true,
+    "durationSec": 2.5,
+    "sound": true,
+    "volume": 1,
+    "position": "top-center",
+    "marginX": 60,
+    "marginY": 60,
+    "scale": 0.6,
+    "pollPosition": "top-left",
+    "pollScale": 0.65,
+    "animIn": "pop",
+    "animOut": "rise",
+    "animSpeed": 1,
+    "shine": true,
+    "iconMotion": true,
+    "timerBar": true,
+    "font": "segoe",
+    "textScale": 1,
+    "textColor": "#ffffff",
+    "titleAccent": true,
+    "bgStyle": "gradient",
+    "bgColor": "#14121e",
+    "bgColor2": "#201834",
+    "bgOpacity": 0.94,
+    "borderWidth": 3,
+    "radius": 26,
+    "glow": true,
+    "colors": {
+      "reward": "#9b6bff",
+      "cheer": "#ffb347",
+      "command": "#4cc3ff",
+      "poll": "#ffb347",
+      "chaos": "#ff4d5e"
+    },
+    "imageSize": "icon",
+    "media": {
+      "reward": {
+        "image": "",
+        "sound": ""
+      },
+      "cheer": {
+        "image": "",
+        "sound": ""
+      },
+      "command": {
+        "image": "",
+        "sound": ""
+      },
+      "poll": {
+        "image": "",
+        "sound": ""
+      },
+      "chaos": {
+        "image": "",
+        "sound": ""
+      }
+    }
+  }
+}

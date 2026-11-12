@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>stream-interact · overlay</title>
+<!--
+  Overlay para OBS (fuente de navegador, 1920×1080). Su apariencia se configura en el panel → Overlay OBS.
+    /overlay                    alertas + votación
+    /overlay?widget=alertas     solo alertas
+    /overlay?widget=votacion    solo votación
+  Opciones: &sonido=0 (sin sonido)  &preview=1 (fondo de cuadros)  &demo=reward|cheer|command|poll|chaos  &demopoll=1
+-->
+<style>
+  @font-face { font-family: 'SI Inter'; src: url('/overlay/fonts/inter-800.woff2') format('woff2'); font-weight: 800; }
+  @font-face { font-family: 'SI Fredoka'; src: url('/overlay/fonts/fredoka-700.woff2') format('woff2'); font-weight: 700; }
+  @font-face { font-family: 'SI Bebas'; src: url('/overlay/fonts/bebas-neue.woff2') format('woff2'); }
+  @font-face { font-family: 'SI Pixel'; src: url('/overlay/fonts/press-start-2p.woff2') format('woff2'); }
+  @font-face { font-family: 'SI VT323'; src: url('/overlay/fonts/vt323.woff2') format('woff2'); }
+
+  :root {
+    /* Valores por defecto; la configuración del panel los reemplaza */
+    --font: 'Segoe UI', 'SI Inter', system-ui, sans-serif;
+    --font-factor: 1;
+    --text-scale: 1;
+    --text: #ffffff;
+    --bg: linear-gradient(135deg, rgba(20, 18, 30, .94), rgba(32, 24, 52, .94));
+    --border-w: 3px;
+    --radius: 26px;
+    --scale: 1;
+    --poll-scale: 1;
+    --speed: 1;
+    --mx: 60px;
+    --my: 60px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; font-family: var(--font); color: var(--text); }
+  body.preview { background: #1b1b22 repeating-conic-gradient(#202029 0 25%, #1b1b22 0 50%) 0 0 / 40px 40px; }
+
+  /* ---------- Posiciones (alertas y votación) ---------- */
+  .layer { position: absolute; inset: 0; display: flex; padding: var(--my) var(--mx); pointer-events: none; }
+  .pos-top-left { justify-content: flex-start; align-items: flex-start; }
+  .pos-top-center { justify-content: center; align-items: flex-start; }
+  .pos-top-right { justify-content: flex-end; align-items: flex-start; }
+  .pos-center { justify-content: center; align-items: center; }
+  .pos-bottom-left { justify-content: flex-start; align-items: flex-end; }
+  .pos-bottom-center { justify-content: center; align-items: flex-end; }
+  .pos-bottom-right { justify-content: flex-end; align-items: flex-end; }
+  .scaler { transform: scale(var(--s)); }
+  .pos-top-left .scaler { transform-origin: top left; }
+  .pos-top-center .scaler { transform-origin: top center; }
+  .pos-top-right .scaler { transform-origin: top right; }
+  .pos-center .scaler { transform-origin: center; }
+  .pos-bottom-left .scaler { transform-origin: bottom left; }
+  .pos-bottom-center .scaler { transform-origin: bottom center; }
+  .pos-bottom-right .scaler { transform-origin: bottom right; }
+  #alerts .scaler { --s: var(--scale); }
+  #poll .scaler { --s: var(--poll-scale); }
+
+  /* ---------- Alerta ---------- */
+  .alert {
+    --accent: #9b6bff; --glow: rgba(155, 107, 255, .55); --soft: rgba(155, 107, 255, .3);
+    position: relative;
+    min-width: 560px; max-width: 1100px;
+    display: flex; align-items: center; gap: 28px;
+    padding: 26px 44px 26px 30px;
+    background: var(--bg);
+    border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius);
+    overflow: hidden;
+    font-size: calc(var(--text-scale) * var(--font-factor) * 1px);
+  }
+  body.glow .alert { box-shadow: 0 0 0 6px rgba(0, 0, 0, .2), 0 0 60px var(--glow), 0 20px 50px rgba(0, 0, 0, .45); }
+  body.bg-none .alert { border-color: transparent; padding-left: 0; padding-right: 0; }
+  body.bg-none .alert .title, body.bg-none .alert .subtitle, body.bg-none .alert .detail { text-shadow: 0 3px 0 rgba(0, 0, 0, .7), 0 0 14px rgba(0, 0, 0, .9); }
+  .alert .icon {
+    flex-shrink: 0; width: 96px; height: 96px; border-radius: calc(var(--radius) * .9);
+    display: grid; place-items: center; font-size: 54px; overflow: hidden;
+    background: var(--soft); border: 2px solid var(--accent);
+  }
+  .alert .icon img { width: 100%; height: 100%; object-fit: contain; }
+  .alert.large { flex-direction: column; text-align: center; padding: 28px 44px 30px; gap: 16px; }
+  .alert.large .media-large { max-width: 520px; max-height: 280px; border-radius: calc(var(--radius) * .6); object-fit: contain; }
+  .alert .text { min-width: 0; }
+  .alert .title { font-size: 54em; font-weight: 900; line-height: 1.08; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 3px 0 rgba(0, 0, 0, .35); }
+  body.title-accent .alert .title { color: var(--accent); }
+  .alert .subtitle { font-size: 36em; font-weight: 700; line-height: 1.25; margin-top: .1em; text-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
+  .alert .detail { font-size: 26em; font-style: italic; opacity: .85; margin-top: .3em; max-width: 900px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.font-pixel .alert .title, body.font-pixel .alert .subtitle { line-height: 1.5; letter-spacing: 0; }
+  body.font-bebas .alert .title, body.font-bebas .alert .subtitle { letter-spacing: .03em; font-weight: 400; }
+  .alert .timer { position: absolute; left: 0; bottom: 0; height: 5px; background: var(--accent); animation: timer linear both; }
+  body:not(.timer) .alert .timer { display: none; }
+
+  body.shine .alert::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .18) 50%, transparent 70%);
+    transform: translateX(-100%); animation: shine calc(1.4s / var(--speed)) calc(.35s / var(--speed)) ease-out;
+  }
+  body.icon-motion .alert .icon { animation: wiggle calc(.8s / var(--speed)) calc(.45s / var(--speed)) ease-in-out; }
+  body.icon-motion .alert.k-chaos .icon { animation: shake calc(.5s / var(--speed)) calc(.4s / var(--speed)) ease-in-out 3; }
+
+  /* Entradas */
+  .in-pop { animation: in-pop calc(.55s / var(--speed)) cubic-bezier(.2, 1.4, .4, 1) both; }
+  .in-slide-down { animation: in-slide-down calc(.5s / var(--speed)) cubic-bezier(.2, 1.2, .4, 1) both; }
+  .in-slide-up { animation: in-slide-up calc(.5s / var(--speed)) cubic-bezier(.2, 1.2, .4, 1) both; }
+  .in-slide-left { animation: in-slide-left calc(.5s / var(--speed)) cubic-bezier(.2, 1.2, .4, 1) both; }
+  .in-slide-right { animation: in-slide-right calc(.5s / var(--speed)) cubic-bezier(.2, 1.2, .4, 1) both; }
+  .in-fade { animation: in-fade calc(.6s / var(--speed)) ease-out both; }
+  .in-zoom { animation: in-zoom calc(.5s / var(--speed)) cubic-bezier(.2, 1.3, .4, 1) both; }
+  .in-drop { animation: in-drop calc(.9s / var(--speed)) linear both; }
+  .in-flip { animation: in-flip calc(.7s / var(--speed)) cubic-bezier(.2, 1.2, .4, 1) both; }
+  /* Salidas */
+  .out-rise { animation: out-rise calc(.45s / var(--speed)) ease-in both !important; }
+  .out-fade { animation: out-fade calc(.45s / var(--speed)) ease-in both !important; }
+  .out-slide-up { animation: out-slide-up calc(.45s / var(--speed)) ease-in both !important; }
+  .out-slide-down { animation: out-slide-down calc(.45s / var(--speed)) ease-in both !important; }
+  .out-slide-left { animation: out-slide-left calc(.45s / var(--speed)) ease-in both !important; }
+  .out-slide-right { animation: out-slide-right calc(.45s / var(--speed)) ease-in both !important; }
+  .out-zoom { animation: out-zoom calc(.45s / var(--speed)) ease-in both !important; }
+  .out-shrink { animation: out-shrink calc(.4s / var(--speed)) ease-in both !important; }
+
+  @keyframes in-pop { from { opacity: 0; transform: translateY(-80px) scale(.7); } to { opacity: 1; transform: none; } }
+  @keyframes in-slide-down { from { opacity: 0; transform: translateY(-160px); } to { opacity: 1; transform: none; } }
+  @keyframes in-slide-up { from { opacity: 0; transform: translateY(160px); } to { opacity: 1; transform: none; } }
+  @keyframes in-slide-left { from { opacity: 0; transform: translateX(260px); } to { opacity: 1; transform: none; } }
+  @keyframes in-slide-right { from { opacity: 0; transform: translateX(-260px); } to { opacity: 1; transform: none; } }
+  @keyframes in-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes in-zoom { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: none; } }
+  @keyframes in-drop {
+    0% { opacity: 0; transform: translateY(-400px); animation-timing-function: ease-in; }
+    45% { opacity: 1; transform: translateY(0); animation-timing-function: ease-out; }
+    65% { transform: translateY(-50px); animation-timing-function: ease-in; }
+    82% { transform: translateY(0); animation-timing-function: ease-out; }
+    92% { transform: translateY(-14px); animation-timing-function: ease-in; }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes in-flip { from { opacity: 0; transform: perspective(900px) rotateX(-90deg); } to { opacity: 1; transform: none; } }
+  @keyframes out-rise { to { opacity: 0; transform: translateY(-40px) scale(.9); } }
+  @keyframes out-fade { to { opacity: 0; } }
+  @keyframes out-slide-up { to { opacity: 0; transform: translateY(-200px); } }
+  @keyframes out-slide-down { to { opacity: 0; transform: translateY(200px); } }
+  @keyframes out-slide-left { to { opacity: 0; transform: translateX(-300px); } }
+  @keyframes out-slide-right { to { opacity: 0; transform: translateX(300px); } }
+  @keyframes out-zoom { to { opacity: 0; transform: scale(1.4); } }
+  @keyframes out-shrink { to { opacity: 0; transform: scale(.2); } }
+  @keyframes shine { to { transform: translateX(100%); } }
+  @keyframes wiggle { 25% { transform: rotate(-12deg) scale(1.1); } 50% { transform: rotate(10deg) scale(1.15); } 75% { transform: rotate(-6deg); } }
+  @keyframes shake { 25% { transform: translateX(-6px) rotate(-6deg); } 75% { transform: translateX(6px) rotate(6deg); } }
+  @keyframes timer { from { width: 100%; } to { width: 0; } }
+
+  /* ---------- Votación ---------- */
+  #poll .scaler { width: 620px; }
+  .poll {
+    --accent: var(--poll-accent, #ffb347);
+    background: var(--bg);
+    border: var(--border-w) solid var(--accent);
+    border-radius: var(--radius);
+    padding: 24px 26px 22px;
+    font-size: calc(var(--text-scale) * var(--font-factor) * 1px);
+  }
+  body.glow .poll { box-shadow: 0 0 0 6px rgba(0, 0, 0, .2), 0 0 50px var(--poll-glow, rgba(255, 179, 71, .35)), 0 20px 50px rgba(0, 0, 0, .45); }
+  .poll.show { animation: in-fade calc(.4s / var(--speed)) ease-out both; }
+  .poll.hide { animation: out-fade calc(.4s / var(--speed)) ease-in both; }
+  .poll-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .poll-tag { font-size: 20em; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  .poll-time { font-size: 30em; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .poll-time.ending { color: #ff4d5e; animation: pulse .5s ease-in-out infinite alternate; }
+  .poll-q { font-size: 34em; font-weight: 800; margin: .25em 0 .4em; line-height: 1.2; }
+  .poll-progress { height: 6px; background: rgba(255, 255, 255, .12); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
+  .poll-progress span { display: block; height: 100%; background: var(--accent); transition: width 1s linear; }
+  .opt { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .opt-num { width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; background: rgba(255, 255, 255, .12); display: grid; place-items: center; font-size: 26em; font-weight: 900; }
+  .opt-bar { position: relative; flex: 1; min-width: 0; height: 52px; border-radius: 12px; background: rgba(0, 0, 0, .45); overflow: hidden; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; gap: 10px; }
+  .opt-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, rgba(155, 107, 255, .75), rgba(155, 107, 255, .45)); transition: width .5s ease; }
+  .opt-label, .opt-count { position: relative; font-size: 26em; font-weight: 800; white-space: nowrap; text-shadow: 0 2px 0 rgba(0, 0, 0, .4); }
+  .opt-label { overflow: hidden; text-overflow: ellipsis; }
+  .opt-count { font-size: 22em; opacity: .9; font-variant-numeric: tabular-nums; }
+  .opt.win .opt-fill { background: linear-gradient(90deg, rgba(61, 220, 132, .85), rgba(61, 220, 132, .5)); }
+  .opt.win .opt-num { background: #3ddc84; color: #06210f; }
+  .opt.lose { opacity: .5; }
+  .poll-foot { margin-top: 6px; font-size: 22em; font-weight: 700; opacity: .85; text-align: center; }
+  .poll-foot b { color: var(--accent); }
+  .poll-result { font-size: 28em; font-weight: 900; color: #3ddc84; text-align: right; }
+  body.font-pixel .poll-q, body.font-pixel .opt-label { line-height: 1.5; }
+  @keyframes pulse { to { transform: scale(1.15); } }
+</style>
+</head>
+<body>
+<div id="alerts" class="layer pos-top-center"><div class="scaler" id="alertBox"></div></div>
+<div id="poll" class="layer pos-bottom-left"><div class="scaler" id="pollBox"></div></div>
+
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  const widget = (params.get('widget') || 'todo').toLowerCase();
+  const showAlerts = widget !== 'votacion';
+  const showPoll = widget !== 'alertas';
+  const demo = params.get('demo');            // alerta de muestra en bucle (vista previa del panel)
+  const demoPoll = params.get('demopoll') === '1';
+  const mute = params.get('sonido') === '0' || Boolean(demo);
+  if (params.get('preview') === '1') document.body.classList.add('preview');
+
+  const ICONS = { reward: '🎁', cheer: '💎', command: '💬', poll: '🗳️', chaos: '⚡', custom: '✨' };
+  const FONTS = {
+    segoe: ["'Segoe UI', 'SI Inter', system-ui, sans-serif", 1],
+    inter: ["'SI Inter', 'Segoe UI', sans-serif", 1],
+    fredoka: ["'SI Fredoka', 'Segoe UI', sans-serif", 1],
+    bebas: ["'SI Bebas', 'Impact', sans-serif", 1.18],
+    pixel: ["'SI Pixel', monospace", 0.62],
+    vt323: ["'SI VT323', monospace", 1.3],
+    mono: ["'Cascadia Code', 'Consolas', monospace", 0.9]
+  };
+  const SAMPLES = {
+    reward: { title: 'Pepe_123', subtitle: 'canjeó Invocar zombie' },
+    cheer: { title: 'Rico', subtitle: 'mandó 500 bits', detail: '¡Toma tus refuerzos!' },
+    command: { title: 'Ana', subtitle: 'usó !lluvia' },
+    poll: { title: 'El chat decidió', subtitle: 'Creeper sorpresa' },
+    chaos: { title: 'Modo caos', subtitle: '!salto' }
+  };
+
+  let config = null;
+  const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const media = (name) => `/overlay/media/${encodeURIComponent(name)}`;
+  const rgba = (hex, a) => {
+    const n = parseInt(String(hex).slice(1), 16);
+    return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+  };
+
+  // ---------- Aplicar la configuración ----------
+  function applyConfig(c) {
+    config = c;
+    const root = document.documentElement.style;
+    const [family, factor] = FONTS[c.font] ?? FONTS.segoe;
+    root.setProperty('--font', family);
+    root.setProperty('--font-factor', factor);
+    root.setProperty('--text-scale', c.textScale);
+    root.setProperty('--text', c.textColor);
+    root.setProperty('--border-w', `${c.borderWidth}px`);
+    root.setProperty('--radius', `${c.radius}px`);
+    root.setProperty('--scale', c.scale);
+    root.setProperty('--poll-scale', c.pollScale);
+    root.setProperty('--speed', c.animSpeed);
+    root.setProperty('--mx', `${c.marginX}px`);
+    root.setProperty('--my', `${c.marginY}px`);
+    root.setProperty('--poll-accent', c.colors.poll);
+    root.setProperty('--poll-glow', rgba(c.colors.poll, 0.35));
+    root.setProperty('--bg',
+      c.bgStyle === 'none' ? 'transparent'
+        : c.bgStyle === 'solid' ? rgba(c.bgColor, c.bgOpacity)
+          : `linear-gradient(135deg, ${rgba(c.bgColor, c.bgOpacity)}, ${rgba(c.bgColor2, c.bgOpacity)})`);
+
+    const b = document.body.classList;
+    b.toggle('glow', c.glow && c.bgStyle !== 'none');
+    b.toggle('shine', c.shine && c.bgStyle !== 'none');
+    b.toggle('icon-motion', c.iconMotion);
+    b.toggle('timer', c.timerBar);
+    b.toggle('title-accent', c.titleAccent);
+    b.toggle('bg-none', c.bgStyle === 'none');
+    for (const f of Object.keys(FONTS)) b.toggle(`font-${f}`, c.font === f);
+
+    document.getElementById('alerts').className = `layer pos-${c.position}`;
+    document.getElementById('poll').className = `layer pos-${c.pollPosition}`;
+
+    if (demo && current) renderAlert(current.data, current.ms, true); // refrescar la muestra con el estilo nuevo
+    if (demoPoll) renderPoll(SAMPLE_POLL, false);
+  }
+
+  const loadConfig = () => fetch('/api/overlay/config').then((r) => r.json()).then(applyConfig).catch(() => {});
+
+  // ---------- Sonido ----------
+  let audioCtx = null;
+  function playSound(kind, file) {
+    if (mute || !config?.sound || !(config.volume > 0)) return;
+    if (file) {
+      const a = new Audio(media(file));
+      a.volume = config.volume;
+      a.play().catch(() => {});
+      return;
+    }
+    try {
+      if (!audioCtx) audioCtx = new AudioContext();
+      const notes = kind === 'chaos' ? [220, 165, 110] : kind === 'cheer' ? [784, 988, 1319] : [660, 880, 1175];
+      const now = audioCtx.currentTime;
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = kind === 'chaos' ? 'sawtooth' : 'triangle';
+        osc.frequency.value = freq;
+        const t = now + i * 0.11;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.25 * config.volume, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.5);
+      });
+    } catch { /* sin audio */ }
+  }
+
+  // ---------- Alertas ----------
+  const box = document.getElementById('alertBox');
+  const queue = [];
+  let current = null; // { data, ms, el }
+  let busy = false;
+
+  function renderAlert(a, ms, instant = false) {
+    const kind = ICONS[a.kind] ? a.kind : 'custom';
+    const accent = /^#[0-9a-f]{6}$/i.test(a.color || '') ? a.color : (config.colors[kind] ?? config.colors.reward);
+    const kindMedia = config.media[kind] ?? {};
+    const image = a.image || kindMedia.image;
+    const large = image && config.imageSize === 'large';
+
+    const el = document.createElement('div');
+    el.className = `alert k-${kind} ${large ? 'large' : ''} ${instant ? '' : `in-${config.animIn}`}`;
+    el.style.setProperty('--accent', accent);
+    el.style.setProperty('--glow', rgba(accent, 0.55));
+    el.style.setProperty('--soft', rgba(accent, 0.3));
+    const icon = image && !large ? `<img src="${media(image)}" alt="">` : ICONS[kind];
+    el.innerHTML = `
+      ${large ? `<img class="media-large" src="${media(image)}" alt="">` : `<div class="icon">${icon}</div>`}
+      <div class="text">
+        ${a.title ? `<div class="title">${esc(a.title)}</div>` : ''}
+        ${a.subtitle ? `<div class="subtitle">${esc(a.subtitle)}</div>` : ''}
+        ${a.detail ? `<div class="detail">“${esc(a.detail)}”</div>` : ''}
+      </div>
+      <div class="timer" style="animation-duration:${ms}ms"></div>`;
+    box.replaceChildren(el);
+    current = { data: a, ms, el };
+    return el;
+  }
+
+  function next() {
+    if (busy || !config || queue.length === 0) return;
+    busy = true;
+    const a = queue.shift();
+    const ms = Math.max(2, Number(config.durationSec) || 6) * 1000;
+    renderAlert(a, ms);
+    const kind = ICONS[a.kind] ? a.kind : 'custom';
+    playSound(kind, a.sound || config.media[kind]?.sound);
+    setTimeout(() => {
+      const el = current?.el;
+      el?.classList.add(`out-${config.animOut}`);
+      setTimeout(() => {
+        if (current?.el === el) { el.remove(); current = null; }
+        busy = false;
+        setTimeout(next, 250);
+      }, 480 / config.animSpeed);
+    }, ms);
+  }
+
+  // Feed en vivo: alertas y avisos de cambios de configuración
+  const source = new EventSource('/api/overlay/feed');
+  source.onmessage = (e) => {
+    const entry = JSON.parse(e.data);
+    if (entry.event === 'config') { loadConfig(); return; }
+    if (!showAlerts || demo) return;
+    queue.push(entry);
+    if (queue.length > 20) queue.splice(0, queue.length - 20);
+    next();
+  };
+  source.onopen = loadConfig; // al reconectar (por ejemplo, si la app se reinició)
+
+  // Modo demo: la misma alerta de muestra una y otra vez
+  if (demo && showAlerts) {
+    const loop = () => {
+      if (!config) return setTimeout(loop, 300);
+      queue.push({ kind: SAMPLES[demo] ? demo : 'reward', ...(SAMPLES[demo] ?? SAMPLES.reward) });
+      next();
+      setTimeout(loop, (Number(config.durationSec) || 6) * 1000 + 1400 / config.animSpeed);
+    };
+    loop();
+  }
+
+  // ---------- Votación ----------
+  const pollBox = document.getElementById('pollBox');
+  const RESULT_MS = 9000;
+  const SAMPLE_POLL = {
+    question: '¿Zombie o creeper?', duration: 30, remainingMs: 18000, total: 5,
+    options: [{ label: 'Zombie', votes: 2 }, { label: 'Creeper sorpresa', votes: 3 }]
+  };
+  let pollState = 'hidden';
+  let resultFor = null;
+
+  function renderPoll(p, result) {
+    const max = Math.max(1, ...p.options.map((o) => o.votes));
+    if (result) {
+      const verdict = p.winner === null ? 'Nadie votó' : `¡Ganó ${esc(p.options[p.winner].label)}!`;
+      pollBox.innerHTML = `<div class="poll">
+        <div class="poll-top"><span class="poll-tag">🗳️ Resultado</span><span class="poll-result">${verdict}</span></div>
+        <div class="poll-q">${esc(p.question)}</div>
+        ${p.options.map((o, i) => `<div class="opt ${i === p.winner ? 'win' : p.winner !== null ? 'lose' : ''}"><span class="opt-num">${i + 1}</span>
+          <div class="opt-bar"><span class="opt-fill" style="width:${(o.votes / max) * 100}%"></span><span class="opt-label">${esc(o.label)}</span><span class="opt-count">${o.votes}</span></div></div>`).join('')}
+      </div>`;
+      return;
+    }
+    const secs = Math.ceil(p.remainingMs / 1000);
+    pollBox.innerHTML = `<div class="poll ${pollState === 'hidden' ? 'show' : ''}">
+      <div class="poll-top"><span class="poll-tag">🗳️ Votación</span><span class="poll-time ${secs <= 5 ? 'ending' : ''}">${secs}s</span></div>
+      <div class="poll-q">${esc(p.question)}</div>
+      <div class="poll-progress"><span style="width:${(p.remainingMs / (p.duration * 1000)) * 100}%"></span></div>
+      ${p.options.map((o, i) => `<div class="opt"><span class="opt-num">${i + 1}</span>
+        <div class="opt-bar"><span class="opt-fill" style="width:${(o.votes / max) * 100}%"></span><span class="opt-label">${esc(o.label)}</span>
+        <span class="opt-count">${o.votes}${p.total ? ` · ${Math.round((o.votes / p.total) * 100)}%` : ''}</span></div></div>`).join('')}
+      <div class="poll-foot">Escribe <b>${p.options.map((_, i) => i + 1).join('</b>, <b>')}</b> en el chat para votar</div>
+    </div>`;
+  }
+
+  function hidePoll() {
+    if (pollState === 'hidden') return;
+    pollState = 'hidden';
+    const el = pollBox.firstElementChild;
+    if (!el) return;
+    el.classList.add('hide');
+    setTimeout(() => { if (pollState === 'hidden') pollBox.innerHTML = ''; }, 420);
+  }
+
+  async function pollTick() {
+    try {
+      const s = await fetch('/api/votacion').then((r) => r.json());
+      if (s.active) {
+        renderPoll(s.active, false);
+        pollState = 'active';
+      } else if (s.last && s.last.reason !== 'cancelled' && Date.now() - new Date(s.last.endedAt).getTime() < RESULT_MS) {
+        if (resultFor !== s.last.endedAt || pollState !== 'result') { resultFor = s.last.endedAt; renderPoll(s.last, true); }
+        pollState = 'result';
+      } else {
+        hidePoll();
+      }
+    } catch { hidePoll(); }
+  }
+
+  if (showPoll) {
+    if (demoPoll) {
+      const wait = () => (config ? renderPoll(SAMPLE_POLL, false) : setTimeout(wait, 200));
+      wait();
+    } else {
+      pollTick();
+      setInterval(pollTick, 1000);
+    }
+  }
+
+  loadConfig();
+})();
+</script>
+</body>
+</html>

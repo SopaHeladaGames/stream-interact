@@ -11,6 +11,7 @@ export const ACTIONS = {
   announce: { label: 'Mensaje en Minecraft', defaults: { text: '', color: 'yellow' } },
   title: { label: 'Título en pantalla', defaults: { title: '', subtitle: '', color: 'red' } },
   chat: { label: 'Responder en el chat', defaults: { message: '' } },
+  overlay: { label: 'Alerta en overlay', defaults: { title: '{user}', subtitle: '', color: '', image: '', sound: '' } },
   wait: { label: 'Esperar', defaults: { ms: 1000 } }
 };
 

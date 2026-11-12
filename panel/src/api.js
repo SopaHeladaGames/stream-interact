@@ -40,6 +40,21 @@ export const api = {
   iniciarCaos: () => request('POST', '/api/caos/iniciar'),
   detenerCaos: () => request('POST', '/api/caos/detener'),
   caosAhora: () => request('POST', '/api/caos/ahora'),
+  overlayConfig: () => request('GET', '/api/overlay/config'),
+  guardarOverlay: (config) => request('PUT', '/api/overlay/config', config),
+  probarOverlay: (kind) => request('POST', '/api/overlay/prueba', { kind }),
+  overlayArchivos: () => request('GET', '/api/overlay/archivos'),
+  borrarArchivo: (name) => request('DELETE', `/api/overlay/archivos/${encodeURIComponent(name)}`),
+  subirArchivo: async (file) => {
+    const res = await fetch(`/api/overlay/archivos?nombre=${encodeURIComponent(file.name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`);
+    return data;
+  },
   servidor: () => request('GET', '/api/servidor'),
   iniciarServidor: () => request('POST', '/api/servidor/iniciar'),
   detenerServidor: () => request('POST', '/api/servidor/detener'),

@@ -136,6 +136,10 @@ export default function Reglas() {
           <input type="checkbox" checked={draft.settings.cooldownReplies !== false} onChange={(e) => setSetting('cooldownReplies', e.target.checked)} />
           Avisar en el chat cuando algo está en cooldown
         </label>
+        <label className="check">
+          <input type="checkbox" checked={draft.settings.pauseRewards !== false} onChange={(e) => setSetting('pauseRewards', e.target.checked)} />
+          Al pausar todo, pausar también en Twitch las recompensas creadas por la app (se reanudan al quitar la pausa)
+        </label>
         <div className="field-row">
           <label className="field">
             <span>Comando de ayuda</span>

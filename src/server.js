@@ -3,6 +3,7 @@ import path from 'node:path';
 import express from 'express';
 import { log } from './core/logger.js';
 import { chatFeed } from './core/chatFeed.js';
+import { overlayFeed } from './core/overlayFeed.js';
 
 /**
  * Servidor local: login de Twitch, API del panel y el panel ya compilado.
@@ -214,6 +215,96 @@ export function registerGameRoutes(app, { polls, chaos, gameStore }) {
   app.post('/api/caos/ahora', route(() => chaos.now()));
 }
 
+/** Overlay para OBS: página, alertas en vivo y ajustes. */
+export function registerOverlayRoutes(app, { gameStore }) {
+  app.get('/api/overlay/feed', (req, res) => {
+    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    res.flushHeaders();
+    const unsubscribe = overlayFeed.subscribe((entry) => res.write(`data: ${JSON.stringify(entry)}\n\n`));
+    const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+    req.on('close', () => { unsubscribe(); clearInterval(ping); });
+  });
+
+  app.get('/api/overlay/config', route(() => ({ ...gameStore.overlay, listeners: overlayFeed.listeners })));
+  app.put('/api/overlay/config', route((req) => {
+    const body = req.body ?? {};
+    const saved = gameStore.saveOverlay({
+      ...gameStore.overlay, ...body,
+      colors: { ...gameStore.overlay.colors, ...(body.colors ?? {}) },
+      media: { ...gameStore.overlay.media, ...(body.media ?? {}) }
+    });
+    overlayFeed.alert({ event: 'config' }); // el overlay (y OBS) aplican el cambio al momento
+    return saved;
+  }));
+
+  // --- Imágenes y sonidos propios (carpeta media/) ---
+  const mediaDir = path.resolve('media');
+  const IMAGE = /\.(png|jpe?g|gif|webp)$/i;
+  const SOUND = /\.(mp3|ogg|wav)$/i;
+  const listMedia = () => {
+    try {
+      return fs.readdirSync(mediaDir)
+        .filter((f) => IMAGE.test(f) || SOUND.test(f))
+        .map((name) => ({ name, type: IMAGE.test(name) ? 'image' : 'sound', size: fs.statSync(path.join(mediaDir, name)).size }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    } catch { return []; }
+  };
+
+  app.get('/api/overlay/archivos', route(() => listMedia()));
+
+  app.post('/api/overlay/archivos', express.raw({ type: () => true, limit: '20mb' }), route((req) => {
+    const original = String(req.query.nombre ?? '');
+    if (!IMAGE.test(original) && !SOUND.test(original)) {
+      throw Object.assign(new Error('Formato no permitido. Usa PNG, JPG, GIF o WEBP para imágenes y MP3, OGG o WAV para sonidos.'), { status: 400 });
+    }
+    if (!req.body?.length) throw Object.assign(new Error('El archivo está vacío'), { status: 400 });
+    const ext = path.extname(original).toLowerCase();
+    const base = path.basename(original, path.extname(original))
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'archivo';
+    fs.mkdirSync(mediaDir, { recursive: true });
+    let name = `${base}${ext}`;
+    for (let i = 2; fs.existsSync(path.join(mediaDir, name)); i++) name = `${base}-${i}${ext}`;
+    fs.writeFileSync(path.join(mediaDir, name), req.body);
+    log.info(`📁 Archivo agregado para el overlay: ${name}`);
+    return { name, type: IMAGE.test(name) ? 'image' : 'sound', size: req.body.length };
+  }));
+
+  app.delete('/api/overlay/archivos/:name', route((req) => {
+    const name = path.basename(req.params.name);
+    const full = path.join(mediaDir, name);
+    if (!fs.existsSync(full)) throw Object.assign(new Error('Ese archivo ya no existe'), { status: 404 });
+    fs.unlinkSync(full);
+    // Quitarlo de los tipos de alerta que lo usaban
+    const media = Object.fromEntries(Object.entries(gameStore.overlay.media).map(([k, m]) => [k, {
+      image: m.image === name ? '' : m.image, sound: m.sound === name ? '' : m.sound
+    }]));
+    gameStore.saveOverlay({ ...gameStore.overlay, media });
+    overlayFeed.alert({ event: 'config' });
+    log.info(`🗑️ Archivo del overlay eliminado: ${name}`);
+  }));
+
+  app.use('/overlay/media', express.static(mediaDir, { maxAge: 0 }));
+
+  // Alerta de prueba desde el panel
+  app.post('/api/overlay/prueba', route((req) => {
+    const kind = ['reward', 'cheer', 'command', 'poll', 'chaos'].includes(req.body?.kind) ? req.body.kind : 'reward';
+    const samples = {
+      reward: { title: 'Pepe_123', subtitle: 'canjeó Invocar zombie', detail: '' },
+      cheer: { title: 'Rico', subtitle: 'mandó 500 bits', detail: '¡Toma tus refuerzos!' },
+      command: { title: 'Ana', subtitle: 'usó !lluvia', detail: '' },
+      poll: { title: 'El chat decidió', subtitle: 'Creeper sorpresa' },
+      chaos: { title: 'Modo caos', subtitle: '!salto' }
+    };
+    overlayFeed.alert({ kind, platform: 'twitch', ...samples[kind] });
+    return { listeners: overlayFeed.listeners };
+  }));
+
+  // La página del overlay (archivos estáticos en /overlay)
+  const dir = path.resolve('overlay');
+  app.get('/overlay', (_req, res) => res.sendFile(path.join(dir, 'index.html')));
+  app.use('/overlay', express.static(dir));
+}
+
 /** Control del servidor de Minecraft desde el panel. */
 export function registerServerRoutes(app, { mcServer, mc }) {
   app.get('/api/servidor', route(() => ({ ...mcServer.status(), rcon: mc.connected })));
@@ -253,5 +344,5 @@ export function servePanel(app) {
     return;
   }
   app.use(express.static(dist));
-  app.get(/^\/(?!api\/|auth\/).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
+  app.get(/^\/(?!api\/|auth\/|overlay).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
 }

@@ -8,6 +8,7 @@ import Servidor from './pages/Servidor.jsx';
 import ChatPanel from './pages/Chat.jsx';
 import Votaciones from './pages/Votaciones.jsx';
 import Caos from './pages/Caos.jsx';
+import Overlay from './pages/Overlay.jsx';
 import PollWidget from './components/PollWidget.jsx';
 
 const PAGES = [
@@ -15,6 +16,7 @@ const PAGES = [
   { id: 'reglas', label: 'Reglas', icon: '⚙' },
   { id: 'votaciones', label: 'Votaciones', icon: '☰' },
   { id: 'caos', label: 'Modo caos', icon: '⚡' },
+  { id: 'overlay', label: 'Overlay OBS', icon: '▢' },
   { id: 'probar', label: 'Probar', icon: '▶' },
   { id: 'servidor', label: 'Servidor', icon: '▣' },
   { id: 'recompensas', label: 'Recompensas', icon: '★' }
@@ -124,6 +126,7 @@ export default function App() {
         {page === 'reglas' && <Reglas />}
         {page === 'votaciones' && <Votaciones />}
         {page === 'caos' && <Caos />}
+        {page === 'overlay' && <Overlay />}
         {page === 'probar' && <Probar />}
         {page === 'servidor' && <Servidor />}
         {page === 'recompensas' && <Recompensas conectado={estado?.twitch?.connected} />}

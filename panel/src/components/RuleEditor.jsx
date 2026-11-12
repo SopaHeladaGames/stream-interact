@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { api } from '../api.js';
 import { ACTIONS, MC_COLORS, TRIGGERS, VARIABLES } from '../rules.js';
 
 /** Convierte ms ↔ segundos para que en el formulario todo se vea en segundos. */
@@ -5,6 +7,10 @@ const toSecs = (ms) => (ms == null ? '' : ms / 1000);
 const toMs = (value) => (value === '' ? undefined : Math.max(0, Number(value)) * 1000);
 
 export default function RuleEditor({ rule, onChange }) {
+  // Imágenes y sonidos subidos en Overlay OBS (para la acción "Alerta en overlay")
+  const [mediaFiles, setMediaFiles] = useState([]);
+  useEffect(() => { api.overlayArchivos().then(setMediaFiles).catch(() => {}); }, []);
+
   const t = rule.trigger ?? {};
   const set = (patch) => onChange({ ...rule, ...patch });
   const setTrigger = (patch) => set({ trigger: { ...t, ...patch } });
@@ -96,7 +102,7 @@ export default function RuleEditor({ rule, onChange }) {
               <button className="icon-btn" onClick={() => moveAction(i, 1)} disabled={i === actions.length - 1} title="Bajar">↓</button>
               <button className="icon-btn danger" onClick={() => setActions((as) => as.filter((_, j) => j !== i))} title="Quitar">✕</button>
             </div>
-            <ActionFields action={a} onChange={(next) => updateAction(i, next)} />
+            <ActionFields action={a} onChange={(next) => updateAction(i, next)} mediaFiles={mediaFiles} />
           </div>
         ))}
 
@@ -112,7 +118,7 @@ export default function RuleEditor({ rule, onChange }) {
   );
 }
 
-function ActionFields({ action, onChange }) {
+function ActionFields({ action, onChange, mediaFiles = [] }) {
   const set = (patch) => onChange({ ...action, ...patch });
 
   switch (action.type) {
@@ -160,6 +166,40 @@ function ActionFields({ action, onChange }) {
           <span>Mensaje en el chat de Twitch</span>
           <input value={action.message ?? ''} onChange={(e) => set({ message: e.target.value })} />
         </label>
+      );
+    case 'overlay':
+      return (
+        <div className="field-row">
+          <label className="field grow">
+            <span>Texto grande</span>
+            <input value={action.title ?? ''} onChange={(e) => set({ title: e.target.value })} placeholder="{user}" />
+          </label>
+          <label className="field grow">
+            <span>Texto pequeño</span>
+            <input value={action.subtitle ?? ''} onChange={(e) => set({ subtitle: e.target.value })} placeholder="te mandó un zombie" />
+          </label>
+          <label className="field">
+            <span>Color</span>
+            <div className="color-select">
+              <input type="color" className="color-input" value={action.color || '#9b6bff'} onChange={(e) => set({ color: e.target.value })} />
+              {action.color && <button type="button" className="icon-btn" title="Color automático" onClick={() => set({ color: '' })}>✕</button>}
+            </div>
+          </label>
+          <label className="field">
+            <span>Imagen / GIF</span>
+            <select value={action.image ?? ''} onChange={(e) => set({ image: e.target.value })}>
+              <option value="">La del tipo de alerta</option>
+              {mediaFiles.filter((f) => f.type === 'image').map((f) => <option key={f.name} value={f.name}>{f.name}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>Sonido</span>
+            <select value={action.sound ?? ''} onChange={(e) => set({ sound: e.target.value })}>
+              <option value="">El del tipo de alerta</option>
+              {mediaFiles.filter((f) => f.type === 'sound').map((f) => <option key={f.name} value={f.name}>{f.name}</option>)}
+            </select>
+          </label>
+        </div>
       );
     case 'wait':
       return (
