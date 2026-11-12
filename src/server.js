@@ -24,7 +24,7 @@ const route = (fn) => async (req, res) => {
   }
 };
 
-export function registerApiRoutes(app, { bus, engine, store, simulate, mc, mcServer, getTwitch, config }) {
+export function registerApiRoutes(app, { bus, engine, store, simulate, mc, mcServer, getTwitch, config, getGame }) {
   // --- Estado general ---
   app.get('/api/estado', route(() => {
     const twitch = getTwitch();
@@ -33,7 +33,8 @@ export function registerApiRoutes(app, { bus, engine, store, simulate, mc, mcSer
       twitch: twitch ? { connected: true, user: twitch.displayName } : { connected: false, loginUrl: '/auth/login' },
       minecraft: { connected: mc.connected, host: `${config.minecraft.host}:${config.minecraft.port}`, player: config.minecraft.player },
       server: mcServer?.status() ?? null,
-      rules: engine.rules.length
+      rules: engine.rules.length,
+      ...(getGame?.() ?? {})
     };
   }));
 
@@ -179,6 +180,38 @@ export function registerApiRoutes(app, { bus, engine, store, simulate, mc, mcSer
   app.get('/pausa', (_req, res) => { bus.pause(); res.redirect('/'); });
   app.get('/reanudar', (_req, res) => { bus.resume(); res.redirect('/'); });
   app.post('/simular', (req, res) => { simulate(req.body ?? {}); res.json({ ok: true }); });
+}
+
+/** Votaciones del chat y modo caos. */
+export function registerGameRoutes(app, { polls, chaos, gameStore }) {
+  // Configuración guardada
+  app.get('/api/juego', route(() => ({ polls: gameStore.polls, chaos: gameStore.chaos })));
+  app.put('/api/juego/votaciones', route((req) => ({ polls: gameStore.savePolls(req.body?.polls) })));
+  app.put('/api/juego/caos', route((req) => {
+    const saved = gameStore.saveChaos(req.body ?? {});
+    chaos.reschedule();
+    return { chaos: saved };
+  }));
+
+  // Votación en curso
+  app.get('/api/votacion', route(() => polls.status()));
+  app.post('/api/votacion/iniciar', route((req) => polls.start(req.body ?? {})));
+  app.post('/api/votacion/terminar', route(() => { polls.finish('manual'); return polls.status(); }));
+  app.post('/api/votacion/cancelar', route(() => { polls.finish('cancelled'); return polls.status(); }));
+  // Voto simulado, para probar sin espectadores
+  app.post('/api/votacion/votar', route((req) => {
+    const user = String(req.body?.user ?? 'Tester');
+    if (!polls.vote({ id: `simulado:${user}`, name: user }, Number(req.body?.option))) {
+      throw Object.assign(new Error('No hay votación en curso o esa opción no existe'), { status: 400 });
+    }
+    return polls.status();
+  }));
+
+  // Modo caos
+  app.get('/api/caos', route(() => chaos.status()));
+  app.post('/api/caos/iniciar', route(() => chaos.start()));
+  app.post('/api/caos/detener', route(() => chaos.stop()));
+  app.post('/api/caos/ahora', route(() => chaos.now()));
 }
 
 /** Control del servidor de Minecraft desde el panel. */

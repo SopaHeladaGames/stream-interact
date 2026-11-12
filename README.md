@@ -173,6 +173,31 @@ El chat está **siempre visible en la columna derecha** de la app, en todas las 
 
 La moderación necesita permisos extra de Twitch (`moderator:manage:chat_messages` y `moderator:manage:banned_users`). La primera vez que abras esta versión, la app te pedirá iniciar sesión de nuevo.
 
+## Votaciones del chat
+
+En la página **Votaciones** creas preguntas con 2 a 5 opciones. Cada opción apunta a una de tus reglas: la que gane, se ejecuta.
+
+- **Votar:** el chat escribe el número de la opción (`1`, `2`… o `!1`, `!2`…). Cada persona tiene un voto y puede cambiarlo.
+- **Lanzar:** con **▶ Iniciar votación** en el panel, o desde el chat (tú y tus mods) con `!votacion` (la primera guardada) o `!votacion nombre`. `!votacion cancelar` la cancela.
+- **En vivo:** el conteo y el tiempo restante se ven arriba del chat, en la columna derecha. Al terminar, el resultado se queda unos segundos.
+- **Empates:** gana una de las empatadas al azar. Si nadie vota, eliges si no pasa nada o gana una al azar.
+- **Avisos:** la app anuncia el inicio y el resultado en el chat de Twitch y dentro de Minecraft.
+- **Probar sin espectadores:** en la página, los botones **+1** simulan votos.
+
+En las reglas, `{user}` vale "El chat" cuando se ejecutan por una votación.
+
+## Modo caos
+
+En la página **Modo caos** marcas qué reglas pueden salir y cada cuánto (un tiempo al azar entre el mínimo y el máximo). Mientras esté activo, la app ejecuta una de esas reglas al azar en cada turno, sin repetir la misma dos veces seguidas.
+
+- **Encender y apagar:** desde el panel, o con `!caos` en el chat (tú y tus mods). Siempre arranca apagado al abrir la app.
+- **⚡ Lanzar uno ahora:** ejecuta un evento al momento, esté o no encendido.
+- **Pausa:** con las interacciones en pausa, o sin conexión a Minecraft, los turnos se saltan.
+
+En las reglas, `{user}` vale "El modo caos".
+
+Las votaciones y la configuración del modo caos se guardan en `config/juego.json`. Ni las votaciones ni el modo caos revisan los cooldowns de las reglas.
+
 ## Servidor de Minecraft desde la app
 
 Agrega a tu `.env`:
@@ -206,6 +231,9 @@ src/
   index.js              arranque desde la terminal (npm start)
   app.js                arranque del backend (lo usan npm start y Electron)
   minecraftServer.js    iniciar/detener el servidor de Minecraft y su consola
+  game/polls.js         votaciones del chat
+  game/chaos.js         modo caos
+  game/gameStore.js     guarda votaciones y modo caos en config/juego.json
   config.js             lee .env
   server.js             API del panel (/api) y servidor del panel compilado
   auth/twitchAuth.js    login OAuth con Twitch y renovación del token

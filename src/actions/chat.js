@@ -8,10 +8,11 @@ import { log } from '../core/logger.js';
 export function chatAction(senders, enabled) {
   return async (action, vars, event) => {
     if (!enabled) return;
-    const send = senders[event.platform];
+    // Votaciones y modo caos no vienen de un chat: indican dónde responder con chatPlatform
+    const send = senders[event.chatPlatform ?? event.platform];
     const text = fill(action.message ?? '', vars);
     if (!send) {
-      log.info(`💬 (sin chat para ${event.platform}) ${text}`);
+      log.info(`💬 (sin chat para ${event.chatPlatform ?? event.platform}) ${text}`);
       return;
     }
     await send(text);

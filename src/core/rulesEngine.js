@@ -73,6 +73,18 @@ export class RulesEngine {
       return;
     }
 
+    const accepted = this.enqueueRule(rule, event, ruleKey);
+
+    if (accepted) {
+      this.lastRun.set(ruleKey, now);
+      this.lastRunByUser.set(userKey, now);
+    } else {
+      await event.refund?.().catch(() => {});
+    }
+  }
+
+  /** Pone en la cola las acciones de una regla. Devuelve false si la cola la rechazó (pausa o llena). */
+  enqueueRule(rule, event, ruleKey) {
     const vars = {
       ...this.context,
       user: safe(event.user.displayName),
@@ -81,7 +93,7 @@ export class RulesEngine {
       platform: event.platform
     };
 
-    const accepted = this.bus.enqueue(ruleKey, async () => {
+    return this.bus.enqueue(ruleKey, async () => {
       for (const action of rule.actions ?? []) {
         const run = this.actions[action.type];
         if (!run) {
@@ -92,13 +104,27 @@ export class RulesEngine {
       }
       await event.complete?.().catch(() => {});
     });
+  }
 
-    if (accepted) {
-      this.lastRun.set(ruleKey, now);
-      this.lastRunByUser.set(userKey, now);
-    } else {
-      await event.refund?.().catch(() => {});
-    }
+  /** ¿Existe una regla activa con ese id? */
+  hasRule(id) {
+    return this.rules.some((r) => r.id === id);
+  }
+
+  /** Nombre legible de una regla (título de la recompensa, comando o monto de bits). */
+  ruleLabel(id) {
+    const rule = this.rules.find((r) => r.id === id);
+    if (!rule) return id;
+    const t = rule.trigger ?? {};
+    return t.name ?? (t.minAmount ? `${t.minAmount}+ bits` : rule.id);
+  }
+
+  /** Ejecuta una regla directamente (votaciones, modo caos), sin revisar disparador ni cooldowns. */
+  runRule(id, event) {
+    const rule = this.rules.find((r) => r.id === id);
+    if (!rule) return false;
+    log.event(`${event.platform} → regla "${id}" (${this.ruleLabel(id)})`);
+    return this.enqueueRule(rule, event, id);
   }
 
   /** Avisa del cooldown una sola vez por usuario y regla mientras dure la espera (evita spam). */

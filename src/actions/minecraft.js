@@ -69,7 +69,9 @@ const PLATFORM_TAG = {
   twitch: { text: '[Twitch] ', color: 'dark_purple' },
   kick: { text: '[Kick] ', color: 'green' },
   youtube: { text: '[YouTube] ', color: 'red' },
-  simulado: { text: '[Prueba] ', color: 'gray' }
+  simulado: { text: '[Prueba] ', color: 'gray' },
+  votacion: { text: '[Votación] ', color: 'gold' },
+  caos: { text: '[Caos] ', color: 'dark_red' }
 };
 
 /** Quita emojis: la fuente de Minecraft no los tiene y salen como cuadritos. */

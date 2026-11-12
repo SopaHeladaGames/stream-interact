@@ -6,10 +6,15 @@ import Probar from './pages/Probar.jsx';
 import Recompensas from './pages/Recompensas.jsx';
 import Servidor from './pages/Servidor.jsx';
 import ChatPanel from './pages/Chat.jsx';
+import Votaciones from './pages/Votaciones.jsx';
+import Caos from './pages/Caos.jsx';
+import PollWidget from './components/PollWidget.jsx';
 
 const PAGES = [
   { id: 'inicio', label: 'Inicio', icon: '◉' },
   { id: 'reglas', label: 'Reglas', icon: '⚙' },
+  { id: 'votaciones', label: 'Votaciones', icon: '☰' },
+  { id: 'caos', label: 'Modo caos', icon: '⚡' },
   { id: 'probar', label: 'Probar', icon: '▶' },
   { id: 'servidor', label: 'Servidor', icon: '▣' },
   { id: 'recompensas', label: 'Recompensas', icon: '★' }
@@ -71,6 +76,10 @@ export default function App() {
     window.addEventListener('mouseup', up);
   };
 
+  // La votación se muestra sobre el chat mientras está activa y unos segundos después (resultado)
+  const pollLive = Boolean(estado?.poll?.active)
+    || (estado?.poll?.lastEndedAt != null && Date.now() - new Date(estado.poll.lastEndedAt).getTime() < 20000);
+
   const togglePause = async () => {
     const next = estado?.paused ? await api.reanudar() : await api.pausa();
     setEstado((e) => ({ ...e, ...next }));
@@ -90,6 +99,8 @@ export default function App() {
           {PAGES.map((p) => (
             <button key={p.id} className={`nav-item ${page === p.id ? 'active' : ''}`} onClick={() => setPage(p.id)}>
               <span className="nav-icon">{p.icon}</span>{p.label}
+              {p.id === 'caos' && estado?.chaos?.running && <span className="nav-live" title="Modo caos activo" />}
+              {p.id === 'votaciones' && estado?.poll?.active && <span className="nav-live" title="Votación en curso" />}
             </button>
           ))}
         </nav>
@@ -111,6 +122,8 @@ export default function App() {
         )}
         {page === 'inicio' && <Inicio estado={estado} />}
         {page === 'reglas' && <Reglas />}
+        {page === 'votaciones' && <Votaciones />}
+        {page === 'caos' && <Caos />}
         {page === 'probar' && <Probar />}
         {page === 'servidor' && <Servidor />}
         {page === 'recompensas' && <Recompensas conectado={estado?.twitch?.connected} />}
@@ -124,6 +137,7 @@ export default function App() {
             canal={estado?.twitch?.user}
             loginUrl={estado?.twitch?.loginUrl}
             onClose={() => setChatOpen(false)}
+            top={<PollWidget live={pollLive} />}
           />
         </aside>
       ) : (

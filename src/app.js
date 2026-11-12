@@ -8,7 +8,10 @@ import { chatAction } from './actions/chat.js';
 import { createTwitchAuth } from './auth/twitchAuth.js';
 import { startTwitch } from './adapters/twitch.js';
 import { MinecraftServer } from './minecraftServer.js';
-import { createServer, registerApiRoutes, registerServerRoutes, servePanel } from './server.js';
+import { GameStore } from './game/gameStore.js';
+import { PollManager } from './game/polls.js';
+import { ChaosMode } from './game/chaos.js';
+import { createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, servePanel } from './server.js';
 
 /**
  * Arranca todo el backend: reglas, RCON, servidor HTTP + panel y Twitch.
@@ -38,6 +41,20 @@ export async function startApp() {
   const engine = new RulesEngine({ rulesPath, bus, context: { player: config.minecraft.player }, actions });
   const store = new RulesStore(rulesPath, Object.keys(actions));
 
+  // Votaciones y modo caos: avisan en el chat de Twitch y dentro de Minecraft
+  const notify = {
+    chat: (text) => { chatSenders.twitch?.(text); },
+    minecraft: async (text, platform, color = 'gold') => {
+      if (mc.connected) await actions.announce({ text, color }, { platform }).catch(() => {});
+    },
+    title: async (title, subtitle, color = 'gold') => {
+      if (mc.connected) await actions.title({ title, subtitle, color }, { player: config.minecraft.player }).catch(() => {});
+    }
+  };
+  const gameStore = new GameStore(path.resolve('config', 'juego.json'));
+  const polls = new PollManager({ bus, engine, store: gameStore, notify });
+  const chaos = new ChaosMode({ bus, engine, store: gameStore, notify, canRun: () => mc.connected });
+
   const simulate = ({ type = 'reward', name = '', user = 'Tester', amount = 0, input = '' }) =>
     bus.emit({
       platform: 'simulado', type, name, amount: Number(amount) || 0, input,
@@ -45,7 +62,11 @@ export async function startApp() {
     });
 
   let twitch = null;
-  registerApiRoutes(app, { bus, engine, store, simulate, mc, mcServer, getTwitch: () => twitch, config });
+  registerApiRoutes(app, {
+    bus, engine, store, simulate, mc, mcServer, getTwitch: () => twitch, config,
+    getGame: () => ({ poll: polls.summary(), chaos: chaos.summary() })
+  });
+  registerGameRoutes(app, { polls, chaos, gameStore });
   registerServerRoutes(app, { mcServer, mc });
 
   // Las rutas /auth/* se registran antes del panel para que este no las tape
@@ -87,6 +108,8 @@ export async function startApp() {
   const stop = () => (stopping ??= (async () => {
     log.info('Cerrando...');
     clearInterval(watch);
+    chaos.stop({ silent: true });
+    polls.dispose();
     twitch?.stop();
     if (mcServer.proc) await mcServer.stop();
     mc.close();
@@ -95,5 +118,5 @@ export async function startApp() {
     await closed;
   })());
 
-  return { config, bus, mc, mcServer, twitchReady, stop, url: `http://localhost:${config.port}` };
+  return { config, bus, mc, mcServer, polls, chaos, twitchReady, stop, url: `http://localhost:${config.port}` };
 }

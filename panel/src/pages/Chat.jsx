@@ -26,7 +26,7 @@ const emoteUrl = (part) =>
 /**
  * Chat de Twitch en la columna derecha de la app: siempre visible en todas las secciones.
  */
-export default function ChatPanel({ conectado, canal, loginUrl, onClose }) {
+export default function ChatPanel({ conectado, canal, loginUrl, onClose, top }) {
   const [entries, setEntries] = useState([]);
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState(null);
@@ -121,6 +121,7 @@ export default function ChatPanel({ conectado, canal, loginUrl, onClose }) {
     return (
       <div className="chat-page">
         {header}
+        {top}
         <div className="chat-box">
           <div className="empty">
             Conecta tu cuenta de Twitch para ver el chat.
@@ -134,6 +135,7 @@ export default function ChatPanel({ conectado, canal, loginUrl, onClose }) {
   return (
     <div className="chat-page">
       {header}
+      {top}
       <div className="chat-box">
         <div className="chat-list" ref={listRef} onScroll={onScroll}>
           {visible.length === 0 && <div className="empty">Aún no hay mensajes. Escribe algo en tu chat o aquí abajo.</div>}

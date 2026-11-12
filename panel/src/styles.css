@@ -231,6 +231,43 @@ textarea { resize: vertical; line-height: 1.5; }
 .char-count { font-size: 11px; color: var(--muted); min-width: 22px; text-align: right; }
 .char-count.warn { color: var(--warn); }
 
+/* --- Votaciones --- */
+.nav-live { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 8px var(--warn); margin-left: auto; }
+.poll-widget { background: linear-gradient(180deg, rgba(255, 179, 71, .1), rgba(255, 179, 71, .03)); border: 1px solid rgba(255, 179, 71, .4); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; }
+.poll-widget.finished { background: var(--panel); border-color: var(--border); }
+.chat-page > .poll-widget { margin: 8px 8px 0; border-radius: 8px; padding: 10px; flex-shrink: 0; }
+.poll-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.poll-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--warn); }
+.poll-widget.finished .poll-tag { color: var(--muted); }
+.poll-timer { font-family: 'Cascadia Code', 'Consolas', monospace; font-weight: 700; }
+.poll-timer.ending { color: var(--error); }
+.poll-verdict { font-weight: 700; color: var(--ok); font-size: 13px; }
+.poll-question { font-weight: 700; margin-bottom: 8px; word-break: break-word; }
+.poll-progress { height: 3px; background: var(--panel-2); border-radius: 2px; margin-bottom: 10px; overflow: hidden; }
+.poll-progress span { display: block; height: 100%; background: var(--warn); transition: width 1s linear; }
+.poll-option { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.poll-num { width: 22px; height: 22px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--border); display: grid; place-items: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.poll-bar { position: relative; flex: 1; min-width: 0; height: 28px; background: var(--bg); border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; gap: 8px; }
+.poll-fill { position: absolute; inset: 0 auto 0 0; background: rgba(155, 107, 255, .35); transition: width .4s ease; }
+.poll-option.winner .poll-fill { background: rgba(61, 220, 132, .35); }
+.poll-option.winner .poll-num { background: var(--ok); color: #06210f; border-color: var(--ok); }
+.poll-label, .poll-count { position: relative; font-size: 13px; white-space: nowrap; }
+.poll-label { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.poll-count { color: var(--muted); font-size: 12px; }
+.poll-controls { margin-top: 10px; }
+.poll-card .field-row { margin-bottom: 14px; }
+.poll-edit-option { display: grid; grid-template-columns: 22px minmax(0, 1.2fr) minmax(0, 1fr) 26px; gap: 8px; align-items: center; margin-bottom: 8px; }
+.poll-card-foot { margin-top: 12px; }
+select.invalid { border-color: var(--error); color: var(--error); }
+
+/* --- Modo caos --- */
+.chaos-countdown { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 15px; color: var(--text); }
+.chaos-hint { padding-top: 9px; }
+.chaos-rules { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin: 4px 0 12px; }
+.chaos-rule { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); cursor: pointer; min-width: 0; }
+.chaos-rule.on { border-color: rgba(155, 107, 255, .6); background: rgba(155, 107, 255, .1); }
+.chaos-rule input { accent-color: var(--accent); }
+
 /* --- Recompensas --- */
 .card.flush { padding: 0; overflow: hidden; }
 .table.rewards td { vertical-align: middle; }
