@@ -10,7 +10,7 @@
       "id": "zombie",
       "trigger": {
         "type": "reward",
-        "name": "Invocar zombie"
+        "name": "Zombie time"
       },
       "cooldownMs": 10000,
       "actions": [

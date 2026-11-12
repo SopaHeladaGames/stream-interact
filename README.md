@@ -146,9 +146,32 @@ O haz **doble clic en `iniciar.vbs`**, que abre la app sin dejar una terminal ab
 - **Ícono de la bandeja en rojo** mientras está en pausa, con un menú rápido para pausar y para iniciar o detener el servidor.
 - **Notificación** si el servidor de Minecraft se cae.
 - **El login de Twitch** se abre en tu navegador normal.
+- **Ctrl+R o F5** recargan el panel (por ejemplo, después de `npm run panel:build`). También puedes usar *Recargar panel* en el menú de la bandeja.
 - **Al salir**, apaga el servidor de Minecraft guardando el mundo.
 
 **Para desarrollar el panel con recarga en caliente** dentro de la app: ejecuta `npm run panel:dev` en una terminal y `npm run desktop:dev` en otra.
+
+## Chat de Twitch en el panel
+
+El chat está **siempre visible en la columna derecha** de la app, en todas las secciones. Muestra los mensajes en vivo con emotes, colores e insignias, y los canjes de recompensas y los bits aparecen ahí mismo.
+
+- **Ancho:** arrastra su borde izquierdo (doble clic vuelve al tamaño normal).
+- **Ocultar:** con **»**; vuelve con la pestaña *Chat* del borde derecho. La app recuerda el ancho y si lo dejaste oculto.
+- **Barra superior:** 🎁 muestra u oculta canjes y bits, 🕒 muestra la hora y ⌫ limpia la vista (no borra nada en Twitch).
+- **Ventana angosta:** el chat se muestra encima del contenido para no apretarlo.
+
+- **Escribir:** desde la caja de abajo. Los mensajes salen con tu cuenta.
+- **Responder:** con ↪ al pasar el mouse sobre un mensaje. *Esc* cancela la respuesta.
+- **Mencionar:** clic en un nombre para agregar `@nombre` a tu mensaje.
+- **Moderar** (al pasar el mouse):
+  - 🗑 borrar el mensaje;
+  - **1m / 10m**: timeout;
+  - ⛔ ban, con confirmación;
+  - ↺ quitar el ban o el timeout.
+- **Sincronización:** si un mod borra mensajes o limpia el chat desde Twitch, también se ve en la app.
+- **Resaltado:** las menciones a ti salen en rojo y los mensajes destacados con puntos, en morado.
+
+La moderación necesita permisos extra de Twitch (`moderator:manage:chat_messages` y `moderator:manage:banned_users`). La primera vez que abras esta versión, la app te pedirá iniciar sesión de nuevo.
 
 ## Servidor de Minecraft desde la app
 
@@ -191,6 +214,7 @@ src/
   core/rulesEngine.js   coincidencia de reglas, cooldowns y variables
   core/rulesStore.js    lectura/escritura validada de rules.json
   core/logger.js        logs en terminal + historial para el panel
+  core/chatFeed.js      historial del chat en vivo para el panel
   actions/minecraft.js  RCON con reconexión automática
   actions/chat.js       respuestas en el chat
 config/rules.json       tus reglas

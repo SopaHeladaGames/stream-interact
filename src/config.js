@@ -20,7 +20,9 @@ export const config = {
       'channel:manage:redemptions', // marcar canjes como completados / reembolsar
       'user:read:chat',             // leer el chat (comandos)
       'user:write:chat',            // responder en el chat
-      'bits:read'                   // cheers
+      'bits:read',                  // cheers
+      'moderator:manage:chat_messages', // borrar mensajes desde el panel
+      'moderator:manage:banned_users'   // timeout / ban desde el panel
     ]
   },
   minecraft: {

@@ -1,6 +1,7 @@
 import { ApiClient } from '@twurple/api';
 import { EventSubWsListener } from '@twurple/eventsub-ws';
 import { log } from '../core/logger.js';
+import { chatFeed } from '../core/chatFeed.js';
 
 /**
  * Adaptador de Twitch: escucha EventSub por WebSocket (no necesita URL pública)
@@ -30,6 +31,10 @@ export async function startTwitch({ authProvider, userId, bus }) {
 
   // 1) Canje de recompensas de puntos de canal
   listener.onChannelRedemptionAdd(userId, (e) => {
+    chatFeed.event({
+      platform: 'twitch', eventType: 'reward', title: e.rewardTitle, amount: e.rewardCost, input: e.input ?? '',
+      user: { id: e.userId, name: e.userName, displayName: e.userDisplayName }
+    });
     const canManage = manageable.has(e.rewardId) && e.status === 'unfulfilled';
     bus.emit({
       platform: 'twitch',
@@ -43,12 +48,30 @@ export async function startTwitch({ authProvider, userId, bus }) {
     });
   });
 
-  // 2) Mensajes de chat que empiezan con "!" → comandos
+  // 2) Mensajes de chat: todos van al panel; los que empiezan con "!" además son comandos
   listener.onChannelChatMessage(userId, userId, (e) => {
     const text = e.messageText.trim();
+    const badges = e.badges ?? {};
+    chatFeed.message({
+      platform: 'twitch',
+      id: e.messageId,
+      user: {
+        id: e.chatterId,
+        name: e.chatterName,
+        displayName: e.chatterDisplayName,
+        color: e.color || null,
+        badges: Object.keys(badges)
+      },
+      parts: normalizeParts(e.messageParts, text),
+      text,
+      reply: e.parentMessageId ? { id: e.parentMessageId, user: e.parentMessageUserDisplayName, text: e.parentMessageText } : null,
+      highlighted: e.messageType === 'channel_points_highlighted',
+      mentionsMe: e.messageParts.some((p) => p.type === 'mention' && p.mention?.user_id === userId),
+      isCommand: text.startsWith('!')
+    });
+
     if (!text.startsWith('!')) return;
     const [name, ...args] = text.split(/\s+/);
-    const badges = e.badges ?? {};
     bus.emit({
       platform: 'twitch',
       type: 'command',
@@ -67,6 +90,10 @@ export async function startTwitch({ authProvider, userId, bus }) {
 
   // 3) Bits (cheers)
   listener.onChannelCheer(userId, (e) => {
+    chatFeed.event({
+      platform: 'twitch', eventType: 'cheer', amount: e.bits, input: e.message ?? '',
+      user: { id: e.userId, name: e.userName, displayName: e.isAnonymous ? 'Anónimo' : e.userDisplayName }
+    });
     bus.emit({
       platform: 'twitch',
       type: 'cheer',
@@ -83,13 +110,33 @@ export async function startTwitch({ authProvider, userId, bus }) {
     });
   });
 
+  // 4) Moderación hecha en Twitch (o desde la app): reflejarla en el panel
+  listener.onChannelChatMessageDelete(userId, userId, (e) => chatFeed.deleted(e.messageId));
+  listener.onChannelChatClearUserMessages(userId, userId, (e) => chatFeed.clearedUser(e.userId));
+  listener.onChannelChatClear(userId, userId, () => chatFeed.cleared());
+
   listener.start();
-  log.info('🟣 Escuchando recompensas, comandos y bits de Twitch');
+  log.info('🟣 Escuchando chat, recompensas, comandos y bits de Twitch');
+
+  const moderate = async (fn) => {
+    try { return await fn(); } catch (err) { throw moderationError(err); }
+  };
 
   return {
     displayName: me.displayName,
     sendChat: (text) => apiClient.chat.sendChatMessage(userId, text).catch((err) =>
       log.warn('No se pudo enviar mensaje al chat:', err.message)),
+    /** Escribir en el chat desde el panel (con respuesta opcional a otro mensaje). */
+    sendFromPanel: (text, replyTo) => moderate(async () => {
+      const res = await apiClient.chat.sendChatMessage(userId, text, replyTo ? { replyParentMessageId: replyTo } : undefined);
+      if (!res.isSent) {
+        throw Object.assign(new Error(`Twitch no envió el mensaje${res.dropReasonMessage ? `: ${res.dropReasonMessage}` : ''}`), { status: 400 });
+      }
+    }),
+    deleteMessage: (messageId) => moderate(() => apiClient.moderation.deleteChatMessages(userId, messageId)),
+    timeout: (targetId, seconds, reason) => moderate(() => apiClient.moderation.banUser(userId, { user: targetId, duration: seconds, reason: reason || 'Timeout desde stream-interact' })),
+    ban: (targetId, reason) => moderate(() => apiClient.moderation.banUser(userId, { user: targetId, reason: reason || 'Ban desde stream-interact' })),
+    unban: (targetId) => moderate(() => apiClient.moderation.unbanUser(userId, targetId)),
     /** Crea una recompensa propiedad de esta app (así se puede completar/reembolsar). */
     createReward: async (data) => {
       try {
@@ -146,6 +193,40 @@ function friendlyError(err) {
   else if (status === 404) message = 'Esa recompensa ya no existe en Twitch.';
   else if (status === 400) {
     try { message = `Twitch rechazó los datos: ${JSON.parse(body).message}`; } catch { /* usar el mensaje original */ }
+  }
+  return Object.assign(new Error(message), { status: status >= 400 && status < 500 ? status : 502 });
+}
+
+/** Convierte las partes del mensaje de Twitch (texto, emotes, menciones, cheermotes) a un formato simple. */
+function normalizeParts(parts, fallbackText) {
+  if (!Array.isArray(parts) || parts.length === 0) return [{ type: 'text', text: fallbackText }];
+  return parts.map((p) => {
+    if (p.type === 'emote' && p.emote?.id) return { type: 'emote', text: p.text, id: p.emote.id, animated: p.emote.format?.includes('animated') };
+    if (p.type === 'mention') return { type: 'mention', text: p.text };
+    if (p.type === 'cheermote') return { type: 'cheermote', text: p.text, bits: p.cheermote?.bits ?? 0 };
+    return { type: 'text', text: p.text };
+  });
+}
+
+/** Errores de chat y moderación en español. */
+function moderationError(err) {
+  if (err.status) return err; // ya es nuestro
+  const status = err.statusCode ?? 500;
+  let message = err.message;
+  let detail = '';
+  try { detail = JSON.parse(err.body).message ?? ''; } catch { /* sin detalle */ }
+  if (status === 401 || (status === 403 && /scope|token/i.test(detail))) {
+    message = 'Faltan permisos de Twitch. Cierra la app, vuelve a abrirla e inicia sesión de nuevo para aceptar los permisos de moderación.';
+  } else if (/may not be banned|cannot be banned|broadcaster/i.test(detail)) {
+    message = 'No se puede aplicar a esa persona (no puedes banearte a ti ni al streamer).';
+  } else if (/already banned/i.test(detail)) {
+    message = 'Ese usuario ya está baneado.';
+  } else if (/not banned/i.test(detail)) {
+    message = 'Ese usuario no tiene ban ni timeout activo.';
+  } else if (status === 404) {
+    message = 'Ese mensaje ya no existe (pudo borrarse o ser muy antiguo).';
+  } else if (detail) {
+    message = `Twitch: ${detail}`;
   }
   return Object.assign(new Error(message), { status: status >= 400 && status < 500 ? status : 502 });
 }

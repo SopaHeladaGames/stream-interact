@@ -32,6 +32,7 @@ let quitting = false;
 let trayHintShown = false;
 let lastPaused = null;
 let lastServerState = null;
+let lastMenuSignature = null;
 
 async function boot() {
   Menu.setApplicationMenu(null);
@@ -54,9 +55,9 @@ async function boot() {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1320,
-    height: 860,
-    minWidth: 900,
+    width: 1560,
+    height: 900,
+    minWidth: 1000,
     minHeight: 600,
     title: APP_NAME,
     icon: path.join(ASSETS, 'icon.png'),
@@ -68,6 +69,19 @@ function createWindow() {
 
   const appUrl = DEV ? 'http://localhost:5173' : backend.url;
   win.loadURL(appUrl);
+
+  // Ctrl+R o F5 recargan el panel (útil después de npm run panel:build); Ctrl+Shift+I abre las herramientas de desarrollo
+  win.webContents.on('before-input-event', (e, input) => {
+    if (input.type !== 'keyDown') return;
+    const ctrl = input.control || input.meta;
+    if (input.key === 'F5' || (ctrl && !input.shift && input.key.toLowerCase() === 'r')) {
+      e.preventDefault();
+      win.webContents.reloadIgnoringCache();
+    } else if (ctrl && input.shift && input.key.toLowerCase() === 'i') {
+      e.preventDefault();
+      win.webContents.toggleDevTools();
+    }
+  });
   win.once('ready-to-show', () => win.show());
 
   // Lo que no es el panel (login de Twitch, enlaces externos) se abre en tu navegador normal
@@ -127,9 +141,15 @@ function refreshTray() {
   }
   tray.setToolTip(`${APP_NAME} — ${paused ? 'EN PAUSA' : 'activo'}${pending ? ` · ${pending} en cola` : ''}`);
 
+  // Reconstruir el menú solo cuando algo cambia (si no, se cerraría mientras lo tienes abierto)
+  const signature = `${paused}|${server.state}|${server.configured}`;
+  if (signature === lastMenuSignature) return;
+  lastMenuSignature = signature;
+
   const owned = ['starting', 'running', 'stopping'].includes(server.state);
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Abrir panel', click: showWindow },
+    { label: 'Recargar panel', click: () => { win?.webContents.reloadIgnoringCache(); showWindow(); } },
     { type: 'separator' },
     { label: paused ? '▶  Reanudar interacciones' : '⏸  Pausar interacciones', accelerator: shortcut, click: togglePause },
     { type: 'separator' },

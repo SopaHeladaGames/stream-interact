@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { log } from './core/logger.js';
+import { chatFeed } from './core/chatFeed.js';
 
 /**
  * Servidor local: login de Twitch, API del panel y el panel ya compilado.
@@ -122,6 +123,56 @@ export function registerApiRoutes(app, { bus, engine, store, simulate, mc, mcSer
     if (!twitch) throw Object.assign(new Error('Twitch no está conectado'), { status: 409 });
     await twitch.deleteReward(req.params.id);
     log.info('🗑️ Recompensa eliminada de Twitch');
+  }));
+
+  // --- Chat de Twitch ---
+  const requireTwitch = () => {
+    const twitch = getTwitch();
+    if (!twitch) throw Object.assign(new Error('Twitch no está conectado'), { status: 409 });
+    return twitch;
+  };
+
+  app.get('/api/chat/feed', (req, res) => {
+    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    res.flushHeaders();
+    const send = (entry) => res.write(`data: ${JSON.stringify(entry)}\n\n`);
+    chatFeed.history().forEach(send);
+    const unsubscribe = chatFeed.subscribe(send);
+    const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+    req.on('close', () => { unsubscribe(); clearInterval(ping); });
+  });
+
+  app.post('/api/chat/enviar', route(async (req) => {
+    const text = String(req.body?.text ?? '').trim();
+    if (!text) throw Object.assign(new Error('Escribe un mensaje'), { status: 400 });
+    if (text.length > 500) throw Object.assign(new Error('Twitch permite máximo 500 caracteres'), { status: 400 });
+    await requireTwitch().sendFromPanel(text, req.body?.replyTo || undefined);
+  }));
+
+  app.delete('/api/chat/mensajes/:id', route(async (req) => {
+    await requireTwitch().deleteMessage(req.params.id);
+  }));
+
+  app.post('/api/chat/timeout', route(async (req) => {
+    const { userId, seconds = 600, reason, userName } = req.body ?? {};
+    if (!userId) throw Object.assign(new Error('Falta el usuario'), { status: 400 });
+    const secs = Math.min(1209600, Math.max(1, Number(seconds)));
+    await requireTwitch().timeout(userId, secs, reason);
+    log.info(`⏱️ Timeout de ${secs}s a ${userName ?? userId} desde el panel`);
+  }));
+
+  app.post('/api/chat/ban', route(async (req) => {
+    const { userId, reason, userName } = req.body ?? {};
+    if (!userId) throw Object.assign(new Error('Falta el usuario'), { status: 400 });
+    await requireTwitch().ban(userId, reason);
+    log.info(`⛔ Ban a ${userName ?? userId} desde el panel`);
+  }));
+
+  app.post('/api/chat/unban', route(async (req) => {
+    const { userId, userName } = req.body ?? {};
+    if (!userId) throw Object.assign(new Error('Falta el usuario'), { status: 400 });
+    await requireTwitch().unban(userId);
+    log.info(`✅ Se quitó el ban/timeout a ${userName ?? userId} desde el panel`);
   }));
 
   // --- Compatibilidad con los enlaces anteriores ---

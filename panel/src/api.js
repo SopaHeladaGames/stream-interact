@@ -23,6 +23,11 @@ export const api = {
   crearRecompensa: (data) => request('POST', '/api/twitch/recompensas', data),
   actualizarRecompensa: (id, patch) => request('PATCH', `/api/twitch/recompensas/${id}`, patch),
   eliminarRecompensa: (id) => request('DELETE', `/api/twitch/recompensas/${id}`),
+  enviarChat: (text, replyTo) => request('POST', '/api/chat/enviar', { text, replyTo }),
+  borrarMensaje: (id) => request('DELETE', `/api/chat/mensajes/${id}`),
+  timeout: (user, seconds) => request('POST', '/api/chat/timeout', { userId: user.id, userName: user.displayName, seconds }),
+  ban: (user) => request('POST', '/api/chat/ban', { userId: user.id, userName: user.displayName }),
+  unban: (user) => request('POST', '/api/chat/unban', { userId: user.id, userName: user.displayName }),
   servidor: () => request('GET', '/api/servidor'),
   iniciarServidor: () => request('POST', '/api/servidor/iniciar'),
   detenerServidor: () => request('POST', '/api/servidor/detener'),
@@ -41,5 +46,12 @@ export function subscribeFeed(onEntry) {
 export function subscribeConsole(onLine) {
   const source = new EventSource('/api/servidor/consola');
   source.onmessage = (e) => onLine(JSON.parse(e.data));
+  return () => source.close();
+}
+
+/** Chat de Twitch en vivo (mensajes, canjes, bits y borrados). */
+export function subscribeChat(onEntry) {
+  const source = new EventSource('/api/chat/feed');
+  source.onmessage = (e) => onEntry(JSON.parse(e.data));
   return () => source.close();
 }
