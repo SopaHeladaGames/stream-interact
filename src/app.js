@@ -70,24 +70,29 @@ export async function startApp() {
         platform: event.platform, eventType: 'donation', amount: event.amount, currency: event.currency,
         money: formatMoney(event.amount, event.currency), input: event.input, user: event.user, isTest: event.isTest
       });
-      // Una donación siempre se ve en el overlay, tenga o no una regla.
-      // Si su regla trae una acción "Alerta en overlay" propia, esa la reemplaza (para no mostrar dos).
-      const rule = engine.findRule(event);
-      const customAlert = (rule?.actions ?? []).some((a) => a.type === 'overlay');
-      if (gameStore.overlay.autoAlerts && !customAlert) {
-        overlayFeed.alert({ ...autoAlert(event, 'donación'), platform: event.platform });
-      }
       bus.emit(event);
     }
   });
   const webhookServer = await donations.startWebhookServer();
+
+  // Donaciones y bits (dinero o apoyo real) siempre se ven en el overlay al llegar, tengan o no una regla.
+  // Si su regla trae una acción "Alerta en overlay" propia, esa la reemplaza (para no mostrar dos).
+  // Las simulaciones de la página Probar siguen el camino normal (alerta solo si hay regla).
+  const ALWAYS_ALERT = new Set(['donation', 'cheer']);
+  const alwaysAlerts = (event) => ALWAYS_ALERT.has(event.type) && event.platform !== 'simulado';
+  bus.onEvent((event) => {
+    if (!alwaysAlerts(event) || !gameStore.overlay.autoAlerts) return;
+    const rule = engine.findRule(event);
+    if ((rule?.actions ?? []).some((a) => a.type === 'overlay')) return;
+    overlayFeed.alert({ ...autoAlert(event, event.type === 'cheer' ? 'bits' : 'donación'), platform: event.platform });
+  });
 
   // Alerta automática en el overlay cada vez que se ejecuta una regla
   // (salvo que la regla tenga su propia acción "overlay")
   engine.onRuleRun((rule, event, label) => {
     if (!gameStore.overlay.autoAlerts) return;
     if ((rule.actions ?? []).some((a) => a.type === 'overlay')) return;
-    if (event.type === 'donation' && event.platform !== 'simulado') return; // ya se mostró al llegar
+    if (alwaysAlerts(event)) return; // ya se mostró al llegar
     overlayFeed.alert({ ...autoAlert(event, label), platform: event.platform });
   });
 

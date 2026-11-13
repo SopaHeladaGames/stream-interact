@@ -209,7 +209,7 @@ La app sirve una página con fondo transparente para agregarla en OBS como **fue
 | `http://localhost:3000/overlay?widget=alertas` | Solo alertas (arriba al centro) |
 | `http://localhost:3000/overlay?widget=votacion` | Solo la votación (abajo a la izquierda) |
 
-- **Alertas:** cada vez que se ejecuta una regla (canje, comando, bits, ganador de una votación o evento del modo caos) aparece una alerta animada, en el mismo orden en que pasan las cosas en el juego. Si llegan varias juntas, salen una tras otra.
+- **Alertas:** cada vez que se ejecuta una regla (canje, comando, bits, ganador de una votación o evento del modo caos) aparece una alerta animada, en el mismo orden en que pasan las cosas en el juego. Si llegan varias juntas, salen una tras otra. Los **bits y las donaciones** muestran su alerta siempre que llegan, aunque no tengan una regla (si su regla tiene una *Alerta en overlay* propia, se usa esa).
 - **Votación:** se ve en vivo con barras, porcentajes y tiempo restante. Al terminar muestra unos segundos el resultado.
 - **Sonido:** cada alerta suena un tono corto, generado por la propia página, sin archivos. Marca *"Controlar audio mediante OBS"* en la fuente para oírlo y ajustarlo. `?sonido=0` en la URL lo apaga solo en esa fuente.
 - **Texto propio:** en el editor de una regla, agrega la acción **Alerta en overlay** con tu texto y color; esa regla usará esa alerta en lugar de la automática.
