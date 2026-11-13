@@ -16,8 +16,9 @@ export default function RuleEditor({ rule, onChange }) {
   const setTrigger = (patch) => set({ trigger: { ...t, ...patch } });
 
   const changeTriggerType = (type) => {
-    if (type === 'cheer') setTrigger({ type, name: undefined, minAmount: t.minAmount ?? 100 });
-    else setTrigger({ type, name: type === 'command' ? (t.name?.startsWith('!') ? t.name : '!comando') : (t.name ?? ''), minAmount: undefined, maxAmount: undefined });
+    if (type === 'cheer') setTrigger({ type, name: undefined, currency: undefined, minAmount: t.minAmount ?? 100 });
+    else if (type === 'donation') setTrigger({ type, name: undefined, minAmount: t.type === 'cheer' ? 50 : (t.minAmount ?? 50) });
+    else setTrigger({ type, name: type === 'command' ? (t.name?.startsWith('!') ? t.name : '!comando') : (t.name ?? ''), minAmount: undefined, maxAmount: undefined, currency: undefined });
   };
 
   const actions = rule.actions ?? [];
@@ -52,6 +53,26 @@ export default function RuleEditor({ rule, onChange }) {
               <input value={t.name ?? ''} onChange={(e) => setTrigger({ name: e.target.value.replace(/\s/g, '').toLowerCase() })} placeholder="!zombie" />
             </label>
           )}
+          {t.type === 'donation' && (
+            <>
+              <label className="field">
+                <span>Monto mínimo</span>
+                <input type="number" min="0" step="0.01" value={t.minAmount ?? ''} onChange={(e) => setTrigger({ minAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+              </label>
+              <label className="field">
+                <span>Monto máximo (opcional)</span>
+                <input type="number" min="0" step="0.01" value={t.maxAmount ?? ''} onChange={(e) => setTrigger({ maxAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+              </label>
+              <label className="field">
+                <span>Moneda (opcional)</span>
+                <input value={t.currency ?? ''} maxLength={3} placeholder="MXN, USD…" onChange={(e) => setTrigger({ currency: e.target.value.toUpperCase().replace(/[^A-Z]/g, '') || undefined })} />
+              </label>
+              <p className="muted small field-note">
+                El monto se compara en la moneda en que llega la donación (no se convierte). Si recibes en varias monedas, crea una regla por moneda.
+                Las reglas se revisan en orden: pon primero las de montos más altos.
+              </p>
+            </>
+          )}
           {t.type === 'cheer' && (
             <>
               <label className="field">
@@ -66,7 +87,11 @@ export default function RuleEditor({ rule, onChange }) {
           )}
         </div>
 
+        {t.type === 'donation' && (
+          <p className="muted small">Las donaciones <strong>no usan cooldown</strong>: cada donación siempre ejecuta su regla.</p>
+        )}
         <div className="field-row">
+          {t.type !== 'donation' && <>
           <label className="field">
             <span>Cooldown general (s)</span>
             <input type="number" min="0" value={toSecs(rule.cooldownMs)} onChange={(e) => set({ cooldownMs: toMs(e.target.value) })} placeholder="0" />
@@ -75,6 +100,7 @@ export default function RuleEditor({ rule, onChange }) {
             <span>Cooldown por usuario (s)</span>
             <input type="number" min="0" value={toSecs(rule.userCooldownMs)} onChange={(e) => set({ userCooldownMs: toMs(e.target.value) })} placeholder="0" />
           </label>
+          </>}
           <label className="field">
             <span>ID interno</span>
             <input value={rule.id ?? ''} onChange={(e) => set({ id: e.target.value.replace(/\s/g, '-') })} />

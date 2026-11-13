@@ -53,6 +53,7 @@
     "colors": {
       "reward": "#9b6bff",
       "cheer": "#ffb347",
+      "donation": "#3ddc84",
       "command": "#4cc3ff",
       "poll": "#ffb347",
       "chaos": "#ff4d5e"
@@ -64,6 +65,10 @@
         "sound": ""
       },
       "cheer": {
+        "image": "",
+        "sound": ""
+      },
+      "donation": {
         "image": "",
         "sound": ""
       },

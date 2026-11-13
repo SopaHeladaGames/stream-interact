@@ -8,7 +8,7 @@
     /overlay                    alertas + votación
     /overlay?widget=alertas     solo alertas
     /overlay?widget=votacion    solo votación
-  Opciones: &sonido=0 (sin sonido)  &preview=1 (fondo de cuadros)  &demo=reward|cheer|command|poll|chaos  &demopoll=1
+  Opciones: &sonido=0 (sin sonido)  &preview=1 (fondo de cuadros)  &demo=reward|cheer|donation|command|poll|chaos  &demopoll=1
 -->
 <style>
   @font-face { font-family: 'SI Inter'; src: url('/overlay/fonts/inter-800.woff2') format('woff2'); font-weight: 800; }
@@ -199,7 +199,7 @@
   const mute = params.get('sonido') === '0' || Boolean(demo);
   if (params.get('preview') === '1') document.body.classList.add('preview');
 
-  const ICONS = { reward: '🎁', cheer: '💎', command: '💬', poll: '🗳️', chaos: '⚡', custom: '✨' };
+  const ICONS = { reward: '🎁', cheer: '💎', donation: '💵', command: '💬', poll: '🗳️', chaos: '⚡', custom: '✨' };
   const FONTS = {
     segoe: ["'Segoe UI', 'SI Inter', system-ui, sans-serif", 1],
     inter: ["'SI Inter', 'Segoe UI', sans-serif", 1],
@@ -212,6 +212,7 @@
   const SAMPLES = {
     reward: { title: 'Pepe_123', subtitle: 'canjeó Invocar zombie' },
     cheer: { title: 'Rico', subtitle: 'mandó 500 bits', detail: '¡Toma tus refuerzos!' },
+    donation: { title: 'Luisa', subtitle: 'donó $50.00 MXN', detail: '¡Saludos desde León!' },
     command: { title: 'Ana', subtitle: 'usó !lluvia' },
     poll: { title: 'El chat decidió', subtitle: 'Creeper sorpresa' },
     chaos: { title: 'Modo caos', subtitle: '!salto' }

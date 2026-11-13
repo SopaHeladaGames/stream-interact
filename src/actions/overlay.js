@@ -1,6 +1,7 @@
 import { fill } from '../core/rulesEngine.js';
 import { overlayFeed } from '../core/overlayFeed.js';
 import { log } from '../core/logger.js';
+import { formatMoney } from '../core/money.js';
 
 /**
  * Acción "overlay": muestra una alerta con texto propio en el overlay de OBS.
@@ -29,6 +30,8 @@ export function autoAlert(event, label) {
       return { kind: 'reward', title: user, subtitle: `canjeó ${label}`, detail: input };
     case 'cheer':
       return { kind: 'cheer', title: user, subtitle: `mandó ${event.amount} bits`, detail: input };
+    case 'donation':
+      return { kind: 'donation', title: user, subtitle: `${event.name === 'subscription' ? 'se suscribió con' : 'donó'} ${formatMoney(event.amount, event.currency)}`, detail: input };
     case 'command':
       return { kind: 'command', title: user, subtitle: `usó ${label}`, detail: input };
     case 'poll':

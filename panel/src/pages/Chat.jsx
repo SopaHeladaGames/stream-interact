@@ -12,6 +12,8 @@ const BADGES = {
   partner: { label: 'Partner', icon: '✔', className: 'bd-partner' }
 };
 
+const DONATION_SOURCES = { streamlabs: 'Streamlabs', streamelements: 'StreamElements', kofi: 'Ko-fi' };
+
 const nameColor = (user) => {
   if (user?.color) return user.color;
   const name = user?.name ?? '';
@@ -240,6 +242,8 @@ function ChatEvent({ e, showTime }) {
       {showTime && <span className="chat-time">{new Date(e.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>}
       {e.eventType === 'reward' ? (
         <span>🎁 <strong>{name}</strong> canjeó <strong>{e.title}</strong> <span className="muted">({e.amount.toLocaleString('es-MX')})</span></span>
+      ) : e.eventType === 'donation' ? (
+        <span>💵 <strong>{name}</strong> donó <strong>{e.money}</strong> <span className="muted">· {DONATION_SOURCES[e.platform] ?? e.platform}{e.isTest ? ' · prueba' : ''}</span></span>
       ) : (
         <span>💎 <strong>{name}</strong> mandó <strong>{e.amount.toLocaleString('es-MX')} bits</strong></span>
       )}

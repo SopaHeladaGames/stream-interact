@@ -13,7 +13,10 @@ import { MinecraftServer } from './minecraftServer.js';
 import { GameStore } from './game/gameStore.js';
 import { PollManager } from './game/polls.js';
 import { ChaosMode } from './game/chaos.js';
-import { createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, registerOverlayRoutes, servePanel } from './server.js';
+import { DonationManager } from './donations/index.js';
+import { chatFeed } from './core/chatFeed.js';
+import { formatMoney } from './core/money.js';
+import { createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, registerOverlayRoutes, registerDonationRoutes, servePanel } from './server.js';
 
 /**
  * Arranca todo el backend: reglas, RCON, servidor HTTP + panel y Twitch.
@@ -58,27 +61,54 @@ export async function startApp() {
   const polls = new PollManager({ bus, engine, store: gameStore, notify });
   const chaos = new ChaosMode({ bus, engine, store: gameStore, notify, canRun: () => mc.connected });
 
+  // Donaciones (Streamlabs, StreamElements, Ko-fi): entran como un evento más, igual que los bits
+  const webhookPort = Number(process.env.WEBHOOK_PORT ?? config.port + 1);
+  const donations = new DonationManager({
+    webhookPort,
+    onDonation: (event) => {
+      chatFeed.event({
+        platform: event.platform, eventType: 'donation', amount: event.amount, currency: event.currency,
+        money: formatMoney(event.amount, event.currency), input: event.input, user: event.user, isTest: event.isTest
+      });
+      // Una donación siempre se ve en el overlay, tenga o no una regla.
+      // Si su regla trae una acción "Alerta en overlay" propia, esa la reemplaza (para no mostrar dos).
+      const rule = engine.findRule(event);
+      const customAlert = (rule?.actions ?? []).some((a) => a.type === 'overlay');
+      if (gameStore.overlay.autoAlerts && !customAlert) {
+        overlayFeed.alert({ ...autoAlert(event, 'donación'), platform: event.platform });
+      }
+      bus.emit(event);
+    }
+  });
+  const webhookServer = await donations.startWebhookServer();
+
   // Alerta automática en el overlay cada vez que se ejecuta una regla
   // (salvo que la regla tenga su propia acción "overlay")
   engine.onRuleRun((rule, event, label) => {
     if (!gameStore.overlay.autoAlerts) return;
     if ((rule.actions ?? []).some((a) => a.type === 'overlay')) return;
+    if (event.type === 'donation' && event.platform !== 'simulado') return; // ya se mostró al llegar
     overlayFeed.alert({ ...autoAlert(event, label), platform: event.platform });
   });
 
-  const simulate = ({ type = 'reward', name = '', user = 'Tester', amount = 0, input = '' }) =>
+  const simulate = ({ type = 'reward', name = '', user = 'Tester', amount = 0, input = '', currency = '' }) =>
     bus.emit({
-      platform: 'simulado', type, name, amount: Number(amount) || 0, input,
+      platform: 'simulado', type, name, amount: Number(amount) || 0, input, currency,
       user: { id: `sim-${user}`, name: user, displayName: user, isMod: true, isBroadcaster: false }
     });
 
   let twitch = null;
   registerApiRoutes(app, {
     bus, engine, store, simulate, mc, mcServer, getTwitch: () => twitch, config,
-    getGame: () => ({ poll: polls.summary(), chaos: chaos.summary() })
+    getGame: () => ({
+      poll: polls.summary(),
+      chaos: chaos.summary(),
+      donations: Object.fromEntries(Object.entries(donations.status().services).map(([id, d]) => [id, d.state]))
+    })
   });
   registerGameRoutes(app, { polls, chaos, gameStore });
   registerOverlayRoutes(app, { gameStore });
+  registerDonationRoutes(app, { donations });
   registerServerRoutes(app, { mcServer, mc });
 
   // Las rutas /auth/* se registran antes del panel para que este no las tape
@@ -129,6 +159,8 @@ export async function startApp() {
     log.info('Cerrando...');
     clearInterval(watch);
     chaos.stop({ silent: true });
+    donations.stop();
+    webhookServer?.close();
     polls.dispose();
     twitch?.stop();
     if (mcServer.proc) await mcServer.stop();
@@ -138,5 +170,5 @@ export async function startApp() {
     await closed;
   })());
 
-  return { config, bus, mc, mcServer, polls, chaos, twitchReady, stop, url: `http://localhost:${config.port}` };
+  return { config, bus, mc, mcServer, polls, chaos, donations, twitchReady, stop, url: `http://localhost:${config.port}` };
 }

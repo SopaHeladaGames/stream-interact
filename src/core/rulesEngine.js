@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { log } from './logger.js';
+import { formatMoney } from './money.js';
 
 /**
  * Lee config/rules.json y decide qué acciones ejecutar para cada evento.
@@ -65,7 +66,8 @@ export class RulesEngine {
     const userKey = `${ruleKey}:${event.user.id}`;
     const cooldownLeft = (rule.cooldownMs ?? 0) - (now - (this.lastRun.get(ruleKey) ?? 0));
     const userCooldownLeft = (rule.userCooldownMs ?? 0) - (now - (this.lastRunByUser.get(userKey) ?? 0));
-    const waitMs = Math.max(cooldownLeft, userCooldownLeft);
+    // Una donación es dinero real: nunca se descarta por cooldown
+    const waitMs = event.type === 'donation' ? 0 : Math.max(cooldownLeft, userCooldownLeft);
 
     if (waitMs > 0) {
       const secs = Math.ceil(waitMs / 1000);
@@ -92,6 +94,8 @@ export class RulesEngine {
       user: safe(event.user.displayName),
       input: safe(event.input),
       amount: String(event.amount ?? 0),
+      currency: event.currency ?? '',
+      money: event.type === 'donation' ? formatMoney(event.amount, event.currency) : String(event.amount ?? 0),
       platform: event.platform
     };
 
@@ -115,6 +119,11 @@ export class RulesEngine {
   /** Recibe cada regla en el momento en que se ejecuta: fn(rule, event, label). */
   onRuleRun(fn) {
     this.runListeners.add(fn);
+  }
+
+  /** La regla que se usaría para este evento (la primera que coincide), o null. */
+  findRule(event) {
+    return this.rules.find((r) => matches(r.trigger, event)) ?? null;
   }
 
   /** ¿Existe una regla activa con ese id? */
@@ -169,6 +178,7 @@ function matches(trigger, event) {
   if (trigger.name && trigger.name.toLowerCase() !== event.name.toLowerCase()) return false;
   if (trigger.minAmount && (event.amount ?? 0) < trigger.minAmount) return false;
   if (trigger.maxAmount && (event.amount ?? 0) > trigger.maxAmount) return false;
+  if (trigger.currency && trigger.currency.toUpperCase() !== String(event.currency ?? '').toUpperCase()) return false;
   return true;
 }
 

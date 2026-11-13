@@ -55,6 +55,9 @@ export const api = {
     if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`);
     return data;
   },
+  donaciones: () => request('GET', '/api/donaciones'),
+  guardarDonacion: (id, patch) => request('PUT', `/api/donaciones/${id}`, patch),
+  probarDonacion: (id, data) => request('POST', `/api/donaciones/${id}/prueba`, data),
   servidor: () => request('GET', '/api/servidor'),
   iniciarServidor: () => request('POST', '/api/servidor/iniciar'),
   detenerServidor: () => request('POST', '/api/servidor/detener'),

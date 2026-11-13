@@ -287,10 +287,11 @@ export function registerOverlayRoutes(app, { gameStore }) {
 
   // Alerta de prueba desde el panel
   app.post('/api/overlay/prueba', route((req) => {
-    const kind = ['reward', 'cheer', 'command', 'poll', 'chaos'].includes(req.body?.kind) ? req.body.kind : 'reward';
+    const kind = ['reward', 'cheer', 'donation', 'command', 'poll', 'chaos'].includes(req.body?.kind) ? req.body.kind : 'reward';
     const samples = {
       reward: { title: 'Pepe_123', subtitle: 'canjeó Invocar zombie', detail: '' },
       cheer: { title: 'Rico', subtitle: 'mandó 500 bits', detail: '¡Toma tus refuerzos!' },
+      donation: { title: 'Luisa', subtitle: 'donó $50.00 MXN', detail: '¡Saludos desde León!' },
       command: { title: 'Ana', subtitle: 'usó !lluvia', detail: '' },
       poll: { title: 'El chat decidió', subtitle: 'Creeper sorpresa' },
       chaos: { title: 'Modo caos', subtitle: '!salto' }
@@ -303,6 +304,16 @@ export function registerOverlayRoutes(app, { gameStore }) {
   const dir = path.resolve('overlay');
   app.get('/overlay', (_req, res) => res.sendFile(path.join(dir, 'index.html')));
   app.use('/overlay', express.static(dir));
+}
+
+/** Donaciones: Streamlabs, StreamElements y Ko-fi. */
+export function registerDonationRoutes(app, { donations }) {
+  app.get('/api/donaciones', route(() => donations.status()));
+  app.put('/api/donaciones/:id', route((req) => {
+    const { enabled, token } = req.body ?? {};
+    return donations.update(req.params.id, { enabled: typeof enabled === 'boolean' ? enabled : undefined, token });
+  }));
+  app.post('/api/donaciones/:id/prueba', route((req) => { donations.test(req.params.id, req.body ?? {}); }));
 }
 
 /** Control del servidor de Minecraft desde el panel. */

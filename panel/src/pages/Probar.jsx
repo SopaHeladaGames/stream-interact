@@ -63,11 +63,19 @@ export default function Probar() {
               {Object.entries(TRIGGERS).map(([t, info]) => <option key={t} value={t}>{info.label}</option>)}
             </select>
           </label>
-          {custom.type === 'cheer' ? (
-            <label className="field">
-              <span>Bits</span>
-              <input type="number" min="1" value={custom.amount} onChange={(e) => setCustom({ ...custom, amount: Number(e.target.value) })} />
-            </label>
+          {custom.type === 'cheer' || custom.type === 'donation' ? (
+            <>
+              <label className="field">
+                <span>{custom.type === 'cheer' ? 'Bits' : 'Monto'}</span>
+                <input type="number" min="1" value={custom.amount} onChange={(e) => setCustom({ ...custom, amount: Number(e.target.value) })} />
+              </label>
+              {custom.type === 'donation' && (
+                <label className="field narrow">
+                  <span>Moneda</span>
+                  <input value={custom.currency ?? 'MXN'} maxLength={3} onChange={(e) => setCustom({ ...custom, currency: e.target.value.toUpperCase() })} />
+                </label>
+              )}
+            </>
           ) : (
             <label className="field grow">
               <span>{custom.type === 'command' ? 'Comando' : 'Título de la recompensa'}</span>
@@ -78,9 +86,10 @@ export default function Probar() {
             <span>Texto del usuario (opcional)</span>
             <input value={custom.input} onChange={(e) => setCustom({ ...custom, input: e.target.value })} />
           </label>
-          <button className="btn primary align-end" onClick={() => fire(custom.type === 'cheer'
-            ? { type: 'cheer', name: 'bits', amount: custom.amount, input: custom.input }
-            : { type: custom.type, name: custom.name, input: custom.input })}>Enviar</button>
+          <button className="btn primary align-end" onClick={() => fire(
+            custom.type === 'cheer' ? { type: 'cheer', name: 'bits', amount: custom.amount, input: custom.input }
+              : custom.type === 'donation' ? { type: 'donation', name: 'donation', amount: custom.amount, currency: custom.currency ?? 'MXN', input: custom.input }
+                : { type: custom.type, name: custom.name, input: custom.input })}>Enviar</button>
         </div>
       </div>
 

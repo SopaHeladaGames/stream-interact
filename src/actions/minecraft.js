@@ -71,6 +71,9 @@ const PLATFORM_TAG = {
   youtube: { text: '[YouTube] ', color: 'red' },
   simulado: { text: '[Prueba] ', color: 'gray' },
   votacion: { text: '[Votación] ', color: 'gold' },
+  streamlabs: { text: '[Donación] ', color: 'green' },
+  streamelements: { text: '[Donación] ', color: 'green' },
+  kofi: { text: '[Ko-fi] ', color: 'aqua' },
   caos: { text: '[Caos] ', color: 'dark_red' }
 };
 

@@ -10,6 +10,7 @@ const URLS = [
 const KINDS = [
   { id: 'reward', label: 'Canje', icon: '🎁' },
   { id: 'cheer', label: 'Bits', icon: '💎' },
+  { id: 'donation', label: 'Donación', icon: '💵' },
   { id: 'command', label: 'Comando', icon: '💬' },
   { id: 'poll', label: 'Votación', icon: '🗳️' },
   { id: 'chaos', label: 'Caos', icon: '⚡' }
@@ -40,23 +41,23 @@ const THEMES = [
   { id: 'clasico', label: 'Clásico', swatch: ['#9b6bff', '#201834'], patch: {
     font: 'segoe', textScale: 1, textColor: '#ffffff', titleAccent: true, bgStyle: 'gradient', bgColor: '#14121e', bgColor2: '#201834', bgOpacity: 0.94,
     borderWidth: 3, radius: 26, glow: true, shine: true, iconMotion: true, animIn: 'pop', animOut: 'rise', animSpeed: 1,
-    colors: { reward: '#9b6bff', cheer: '#ffb347', command: '#4cc3ff', poll: '#ffb347', chaos: '#ff4d5e' } } },
+    colors: { reward: '#9b6bff', cheer: '#ffb347', donation: '#3ddc84', command: '#4cc3ff', poll: '#ffb347', chaos: '#ff4d5e' } } },
   { id: 'neon', label: 'Neón', swatch: ['#ff3df2', '#0b0b18'], patch: {
     font: 'inter', textScale: 1, textColor: '#ffffff', titleAccent: true, bgStyle: 'gradient', bgColor: '#07070f', bgColor2: '#150a2b', bgOpacity: 0.92,
     borderWidth: 4, radius: 18, glow: true, shine: true, iconMotion: true, animIn: 'zoom', animOut: 'zoom', animSpeed: 1.1,
-    colors: { reward: '#ff3df2', cheer: '#ffe14d', command: '#3df2ff', poll: '#ffe14d', chaos: '#ff3d5a' } } },
+    colors: { reward: '#ff3df2', cheer: '#ffe14d', donation: '#3dff8a', command: '#3df2ff', poll: '#ffe14d', chaos: '#ff3d5a' } } },
   { id: 'minimal', label: 'Minimal', swatch: ['#e8e8f0', '#101014'], patch: {
     font: 'inter', textScale: 0.85, textColor: '#f2f2f7', titleAccent: true, bgStyle: 'solid', bgColor: '#101014', bgColor2: '#101014', bgOpacity: 0.85,
     borderWidth: 0, radius: 12, glow: false, shine: false, iconMotion: false, animIn: 'fade', animOut: 'fade', animSpeed: 1,
-    colors: { reward: '#b9a2ff', cheer: '#ffd08a', command: '#9fdcff', poll: '#ffd08a', chaos: '#ff8a96' } } },
+    colors: { reward: '#b9a2ff', cheer: '#ffd08a', donation: '#9ff0bf', command: '#9fdcff', poll: '#ffd08a', chaos: '#ff8a96' } } },
   { id: 'pixel', label: 'Pixel', swatch: ['#55ff55', '#1d1d1d'], patch: {
     font: 'pixel', textScale: 1, textColor: '#ffffff', titleAccent: true, bgStyle: 'solid', bgColor: '#1d1d1d', bgColor2: '#1d1d1d', bgOpacity: 0.95,
     borderWidth: 6, radius: 0, glow: false, shine: false, iconMotion: true, animIn: 'drop', animOut: 'slide-up', animSpeed: 1,
-    colors: { reward: '#55ff55', cheer: '#ffff55', command: '#55ffff', poll: '#ffaa00', chaos: '#ff5555' } } },
+    colors: { reward: '#55ff55', cheer: '#ffff55', donation: '#55ff55', command: '#55ffff', poll: '#ffaa00', chaos: '#ff5555' } } },
   { id: 'sinfondo', label: 'Sin fondo', swatch: ['#ffffff', '#555555'], patch: {
     font: 'bebas', textScale: 1.3, textColor: '#ffffff', titleAccent: true, bgStyle: 'none', borderWidth: 0, radius: 0,
     glow: false, shine: false, iconMotion: true, animIn: 'slide-right', animOut: 'slide-left', animSpeed: 1,
-    colors: { reward: '#c9a8ff', cheer: '#ffc670', command: '#7fd4ff', poll: '#ffc670', chaos: '#ff7080' } } }
+    colors: { reward: '#c9a8ff', cheer: '#ffc670', donation: '#8cf0b4', command: '#7fd4ff', poll: '#ffc670', chaos: '#ff7080' } } }
 ];
 const TABS = [
   { id: 'posicion', label: 'Posición' },

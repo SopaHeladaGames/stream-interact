@@ -2,7 +2,7 @@
  * Ajustes del overlay de OBS: comportamiento, posición, animación, estilo y archivos propios.
  * Todo se valida aquí para que el overlay nunca reciba valores rotos.
  */
-const KINDS = ['reward', 'cheer', 'command', 'poll', 'chaos'];
+const KINDS = ['reward', 'cheer', 'donation', 'command', 'poll', 'chaos'];
 const POSITIONS = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
 const ANIM_IN = ['pop', 'slide-down', 'slide-up', 'slide-left', 'slide-right', 'fade', 'zoom', 'drop', 'flip'];
 const ANIM_OUT = ['rise', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom', 'shrink'];
@@ -41,7 +41,7 @@ export const OVERLAY_DEFAULTS = {
   borderWidth: 3,
   radius: 26,
   glow: true,
-  colors: { reward: '#9b6bff', cheer: '#ffb347', command: '#4cc3ff', poll: '#ffb347', chaos: '#ff4d5e' },
+  colors: { reward: '#9b6bff', cheer: '#ffb347', donation: '#3ddc84', command: '#4cc3ff', poll: '#ffb347', chaos: '#ff4d5e' },
   // Imágenes y sonidos (nombres de archivo de la carpeta media/)
   imageSize: 'icon',
   media: Object.fromEntries(KINDS.map((k) => [k, { image: '', sound: '' }]))

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 
-export const TRIGGER_TYPES = ['reward', 'command', 'cheer'];
+export const TRIGGER_TYPES = ['reward', 'command', 'cheer', 'donation'];
 
 /**
  * Lee y guarda config/rules.json validando su contenido,

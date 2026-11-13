@@ -3,7 +3,8 @@
 export const TRIGGERS = {
   reward: { label: 'Recompensa', hint: 'Canje de puntos del canal' },
   command: { label: 'Comando', hint: 'Mensaje del chat que empieza con !' },
-  cheer: { label: 'Bits', hint: 'Cheers con un mínimo de bits' }
+  cheer: { label: 'Bits', hint: 'Cheers con un mínimo de bits' },
+  donation: { label: 'Donación', hint: 'Streamlabs, StreamElements o Ko-fi, por monto' }
 };
 
 export const ACTIONS = {
@@ -21,12 +22,17 @@ export const MC_COLORS = {
   dark_blue: '#0000aa', light_purple: '#ff55ff', dark_purple: '#aa00aa', gray: '#aaaaaa', dark_gray: '#555555', black: '#000000'
 };
 
-export const VARIABLES = ['{user}', '{player}', '{input}', '{amount}', '{platform}'];
+export const VARIABLES = ['{user}', '{player}', '{input}', '{amount}', '{currency}', '{money}', '{platform}'];
 
 export function describeTrigger(t = {}) {
   if (t.type === 'cheer') {
     if (t.minAmount && t.maxAmount) return `${t.minAmount}–${t.maxAmount} bits`;
     return t.minAmount ? `${t.minAmount}+ bits` : 'Cualquier cheer';
+  }
+  if (t.type === 'donation') {
+    const cur = t.currency ? ` ${t.currency}` : '';
+    if (t.minAmount && t.maxAmount) return `$${t.minAmount}–${t.maxAmount}${cur}`;
+    return t.minAmount ? `$${t.minAmount}+${cur}` : `Cualquier donación${cur}`;
   }
   return t.name || '(sin nombre)';
 }
@@ -46,6 +52,7 @@ export function newRule(existingIds) {
 export function simulatedEventFor(rule, user = 'Tester') {
   const t = rule.trigger ?? {};
   if (t.type === 'cheer') return { type: 'cheer', name: 'bits', user, amount: t.minAmount || 100 };
+  if (t.type === 'donation') return { type: 'donation', name: 'donation', user, amount: t.minAmount || 50, currency: t.currency || 'MXN' };
   return { type: t.type, name: t.name, user, amount: 0, input: '' };
 }
 

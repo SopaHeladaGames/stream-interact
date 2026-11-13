@@ -9,6 +9,7 @@ import ChatPanel from './pages/Chat.jsx';
 import Votaciones from './pages/Votaciones.jsx';
 import Caos from './pages/Caos.jsx';
 import Overlay from './pages/Overlay.jsx';
+import Donaciones from './pages/Donaciones.jsx';
 import PollWidget from './components/PollWidget.jsx';
 
 const PAGES = [
@@ -17,6 +18,7 @@ const PAGES = [
   { id: 'votaciones', label: 'Votaciones', icon: '☰' },
   { id: 'caos', label: 'Modo caos', icon: '⚡' },
   { id: 'overlay', label: 'Overlay OBS', icon: '▢' },
+  { id: 'donaciones', label: 'Donaciones', icon: '$' },
   { id: 'probar', label: 'Probar', icon: '▶' },
   { id: 'servidor', label: 'Servidor', icon: '▣' },
   { id: 'recompensas', label: 'Recompensas', icon: '★' }
@@ -103,6 +105,8 @@ export default function App() {
               <span className="nav-icon">{p.icon}</span>{p.label}
               {p.id === 'caos' && estado?.chaos?.running && <span className="nav-live" title="Modo caos activo" />}
               {p.id === 'votaciones' && estado?.poll?.active && <span className="nav-live" title="Votación en curso" />}
+              {p.id === 'donaciones' && Object.values(estado?.donations ?? {}).some((d) => d === 'error') && <span className="nav-live error" title="Un servicio de donaciones tiene un error" />}
+              {p.id === 'donaciones' && !Object.values(estado?.donations ?? {}).some((d) => d === 'error') && Object.values(estado?.donations ?? {}).some((d) => d === 'connected' || d === 'listening') && <span className="nav-live ok" title="Donaciones conectadas" />}
             </button>
           ))}
         </nav>
@@ -127,6 +131,7 @@ export default function App() {
         {page === 'votaciones' && <Votaciones />}
         {page === 'caos' && <Caos />}
         {page === 'overlay' && <Overlay />}
+        {page === 'donaciones' && <Donaciones />}
         {page === 'probar' && <Probar />}
         {page === 'servidor' && <Servidor />}
         {page === 'recompensas' && <Recompensas conectado={estado?.twitch?.connected} />}

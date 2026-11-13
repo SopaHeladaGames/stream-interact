@@ -78,6 +78,7 @@ Cada regla tiene un **trigger** (cuándo se activa) y una lista de **acciones** 
 
 - **Tipos de trigger:**
   - `reward`: recompensa; `name` es el título exacto, sin importar mayúsculas.
+  - `donation`: donación (Streamlabs, StreamElements o Ko-fi); se filtra con `minAmount`, `maxAmount` y `currency`.
   - `command`: comando del chat, por ejemplo `!lluvia`.
   - `cheer`: bits; se filtra con `minAmount` / `maxAmount`.
 - **Variables:** `{player}`, `{user}`, `{input}` (texto del usuario, ya limpio), `{amount}` y `{platform}`.
@@ -240,6 +241,28 @@ La app tiene que estar abierta para que el overlay funcione. Si OBS se abre ante
 
 Al pausar (botón del panel, `!pausa` o `Ctrl+Shift+P`), las recompensas **creadas por la app** también se pausan en Twitch, para que nadie gaste puntos mientras tanto. Al reanudar, la app reanuda solo las que pausó ella. Si cierras la app estando en pausa, las reanuda la próxima vez que la abras. Se desactiva en *Reglas → Ajustes*.
 
+## Donaciones (Streamlabs, StreamElements y Ko-fi)
+
+En la página **Donaciones** del panel configuras cada servicio: pegas su token, lo activas o lo dejas guardado y desactivado para cuando lo necesites. Cada servicio muestra su estado (conectado, error, etc.) y tiene un botón para mandar una donación de prueba.
+
+| Servicio | Cómo se conecta | Token |
+|----------|-----------------|-------|
+| Streamlabs | En tiempo real (Socket API) | streamlabs.com → *Account Settings → API Settings → API Tokens* → **Your Socket API Token** |
+| StreamElements | En tiempo real (WebSocket "Astro", tema `channel.tips`) | streamelements.com → tu avatar → tu canal → **JWT Token** |
+| Ko-fi | Webhook: necesita un túnel | ko-fi.com → *More → API → Webhooks → Advanced* → **Verification Token** |
+
+- **Uso:** cada donación llega como un evento de tipo **Donación**. En el editor de reglas eliges el disparador *Donación* con monto mínimo, monto máximo y moneda (opcional). El monto se compara en la moneda en que llega, sin conversión.
+- **Variables:** `{amount}` (50), `{currency}` (MXN) y `{money}` ($50.00 MXN).
+- **Sin cooldown:** las donaciones nunca se descartan por cooldown, porque son dinero real.
+- **Dónde se ven:** en el chat de la derecha y en el overlay, con su propio color, imagen y sonido (tipo *Donación* en Overlay OBS). Las respuestas al chat (acción *Responder en el chat*) salen en Twitch. Las donaciones de prueba no escriben en tu chat real.
+- **Ko-fi:**
+  - recibe en un puerto aparte (`WEBHOOK_PORT`, 3001), que solo acepta avisos con tu token de verificación; el panel nunca queda expuesto por el túnel;
+  - las donaciones privadas salen como "Anónimo" y sin mensaje;
+  - las membresías también cuentan como donación, y las órdenes de tienda no.
+- **Túnel para Ko-fi:** `cloudflared tunnel --url http://localhost:3001`. Luego pon en Ko-fi la URL que te da, más `/webhooks/kofi`. Los pasos están en la página Donaciones.
+
+Los tokens se guardan en `data/donaciones.json`, que no se sube a Git.
+
 ## Servidor de Minecraft desde la app
 
 Agrega a tu `.env`:
@@ -276,6 +299,8 @@ src/
   index.js              arranque desde la terminal (npm start)
   app.js                arranque del backend (lo usan npm start y Electron)
   minecraftServer.js    iniciar/detener el servidor de Minecraft y su consola
+  donations/            Streamlabs, StreamElements y Ko-fi (conexión, reconexión y webhooks)
+  core/money.js         formato de montos ($50.00 MXN)
   game/polls.js         votaciones del chat
   game/chaos.js         modo caos
   game/gameStore.js     guarda votaciones, modo caos y overlay en config/juego.json
