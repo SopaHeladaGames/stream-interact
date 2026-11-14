@@ -13,7 +13,15 @@ export const ACTIONS = {
   title: { label: 'Título en pantalla', defaults: { title: '', subtitle: '', color: 'red' } },
   chat: { label: 'Responder en el chat', defaults: { message: '' } },
   overlay: { label: 'Alerta en overlay', defaults: { title: '{user}', subtitle: '', color: '', image: '', sound: '' } },
+  gamerule: { label: 'Regla del mundo', defaults: { rule: 'natural_health_regeneration', value: false, seconds: 300, endMessage: '' } },
   wait: { label: 'Esperar', defaults: { ms: 1000 } }
+};
+
+export const TARGETS = {
+  me: { label: 'Tú', hint: 'Siempre a ti ({player})' },
+  chat: { label: 'Lo elige el chat', hint: 'Al jugador que escriba el espectador' },
+  random: { label: 'Al azar', hint: 'A alguien conectado al azar (te incluye)' },
+  all: { label: 'Todos', hint: 'A todos los conectados' }
 };
 
 export const MC_COLORS = {
@@ -22,7 +30,7 @@ export const MC_COLORS = {
   dark_blue: '#0000aa', light_purple: '#ff55ff', dark_purple: '#aa00aa', gray: '#aaaaaa', dark_gray: '#555555', black: '#000000'
 };
 
-export const VARIABLES = ['{user}', '{player}', '{input}', '{amount}', '{currency}', '{money}', '{platform}'];
+export const VARIABLES = ['{user}', '{target}', '{player}', '{input}', '{amount}', '{currency}', '{money}', '{platform}'];
 
 export function describeTrigger(t = {}) {
   if (t.type === 'cheer') {

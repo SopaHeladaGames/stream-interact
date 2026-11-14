@@ -7,11 +7,12 @@ import { formatMoney } from './money.js';
  * Se recarga solo cuando guardas el archivo (no necesitas reiniciar).
  */
 export class RulesEngine {
-  constructor({ rulesPath, bus, actions, context }) {
+  constructor({ rulesPath, bus, actions, context, targets }) {
     this.rulesPath = rulesPath;
     this.bus = bus;
     this.actions = actions;   // { minecraft: fn, chat: fn, ... }
     this.context = context;   // variables fijas, ej. { player }
+    this.targets = targets;   // PlayerTargets: a quién le llega cada regla ({target})
     this.rules = [];
     this.settings = {};
     this.lastRun = new Map();       // ruleKey -> timestamp
@@ -19,6 +20,7 @@ export class RulesEngine {
     this.warned = new Map();        // `${ruleKey}:${userId}` -> hasta cuándo ya se avisó
     this.lastHelp = 0;
     this.runListeners = new Set();
+    this.recordListeners = new Set(); // historial / estadísticas
     this.load();
     fs.watchFile(rulesPath, { interval: 1000 }, () => this.load());
     bus.onEvent((event) => this.handle(event));
@@ -59,7 +61,11 @@ export class RulesEngine {
     }
 
     const rule = this.rules.find((r) => matches(r.trigger, event));
-    if (!rule) return;
+    if (!rule) {
+      // Bits y donaciones se guardan aunque no tengan regla (para las estadísticas)
+      if (event.type === 'cheer' || event.type === 'donation') this.#record(event, null, 'sin-regla');
+      return;
+    }
 
     const now = Date.now();
     const ruleKey = rule.id ?? rule.trigger.name ?? JSON.stringify(rule.trigger);
@@ -73,11 +79,26 @@ export class RulesEngine {
       const secs = Math.ceil(waitMs / 1000);
       log.warn(`"${ruleKey}" en cooldown (${secs}s) para ${event.user.displayName}`);
       const refunded = event.refund ? await event.refund().then(() => true, () => false) : false;
+      this.#record(event, rule, 'cooldown', { refunded });
       await this.warnCooldown(event, userKey, now + waitMs, secs, refunded);
       return;
     }
 
-    const accepted = this.enqueueRule(rule, event, ruleKey);
+    // ¿A quién le toca? Si el espectador eligió a alguien que no está, se le avisa y se devuelven los puntos
+    let target = null;
+    if (rule.target === 'chat' && this.targets) {
+      const strict = event.type === 'reward' || event.type === 'command';
+      target = await this.targets.resolve('chat', event.input, { strict });
+      if (target.error) {
+        log.warn(`"${ruleKey}" de ${event.user.displayName}: ${target.error}`);
+        const refunded = event.refund ? await event.refund().then(() => true, () => false) : false;
+        this.#record(event, rule, 'rechazada', { refunded, reason: target.error });
+        await this.reply(event, `@${event.user.name} ${target.error}${refunded ? ' Te devolví tus puntos.' : ''}`);
+        return;
+      }
+    }
+
+    const accepted = this.enqueueRule(rule, event, ruleKey, target);
 
     if (accepted) {
       this.lastRun.set(ruleKey, now);
@@ -88,7 +109,7 @@ export class RulesEngine {
   }
 
   /** Pone en la cola las acciones de una regla. Devuelve false si la cola la rechazó (pausa o llena). */
-  enqueueRule(rule, event, ruleKey) {
+  enqueueRule(rule, event, ruleKey, target = null, mode = null) {
     const vars = {
       ...this.context,
       user: safe(event.user.displayName),
@@ -99,21 +120,65 @@ export class RulesEngine {
       platform: event.platform
     };
 
-    return this.bus.enqueue(ruleKey, async () => {
+    const accepted = this.bus.enqueue(ruleKey, async () => {
+      // Al azar y todos se deciden al ejecutarse, con los que estén conectados en ese momento
+      const effectiveMode = mode ?? rule.target ?? 'me';
+      const t = target ?? (this.targets
+        ? await this.targets.resolve(effectiveMode, event.input)
+        : { selector: this.context.player, display: this.context.player });
+      try { event.onTarget?.(t); } catch { /* solo informativo */ }
+      // En comandos {target} es el nombre o el selector (@a[...]); en textos, el nombre o "todos"
+      const commandVars = { ...vars, target: t.selector, titleTarget: t.selector };
+      const textVars = { ...vars, target: t.display, titleTarget: t.selector };
+      if (effectiveMode !== 'me') log.info(`🎯 "${this.ruleLabel(rule.id)}" → ${t.display}`);
       // Avisar (overlay) justo cuando la regla se ejecuta, en el mismo orden que el juego
       for (const fn of this.runListeners) {
         try { fn(rule, event, this.ruleLabel(rule.id)); } catch (err) { log.error('Error en aviso de regla:', err.message); }
       }
-      for (const action of rule.actions ?? []) {
-        const run = this.actions[action.type];
-        if (!run) {
-          log.error(`Tipo de acción desconocido: "${action.type}"`);
-          continue;
+      try {
+        for (const action of rule.actions ?? []) {
+          const run = this.actions[action.type];
+          if (!run) {
+            log.error(`Tipo de acción desconocido: "${action.type}"`);
+            continue;
+          }
+          await run(action, action.type === 'minecraft' ? commandVars : textVars, event);
         }
-        await run(action, vars, event);
+      } catch (err) {
+        this.#record(event, rule, 'error', { target: t.display, reason: err.message });
+        throw err;
       }
+      this.#record(event, rule, 'ok', { target: t.display });
       await event.complete?.().catch(() => {});
     });
+    if (!accepted) this.#record(event, rule, 'pausa');
+    return accepted;
+  }
+
+  /** Recibe cada interacción con su resultado: fn(registro). */
+  onRecord(fn) {
+    this.recordListeners.add(fn);
+  }
+
+  #record(event, rule, status, extra = {}) {
+    if (this.recordListeners.size === 0) return;
+    const rec = {
+      status,
+      platform: event.platform,
+      type: event.type,
+      rule: rule?.id ?? null,
+      label: rule ? this.ruleLabel(rule.id) : (event.name ?? event.type),
+      user: event.user?.displayName ?? '',
+      userId: event.user?.id ? `${event.platform}:${event.user.id}` : null,
+      amount: event.amount || undefined,
+      currency: event.currency || undefined,
+      input: event.input ? String(event.input).slice(0, 80) : undefined,
+      test: event.platform === 'simulado' || undefined,
+      ...extra
+    };
+    for (const fn of this.recordListeners) {
+      try { fn(rec); } catch (err) { log.error('Error guardando historial:', err.message); }
+    }
   }
 
   /** Recibe cada regla en el momento en que se ejecuta: fn(rule, event, label). */
@@ -136,15 +201,19 @@ export class RulesEngine {
     const rule = this.rules.find((r) => r.id === id);
     if (!rule) return id;
     const t = rule.trigger ?? {};
+    if (t.type === 'donation') return t.minAmount ? `$${t.minAmount}+${t.currency ? ` ${t.currency}` : ''}` : 'Donación';
     return t.name ?? (t.minAmount ? `${t.minAmount}+ bits` : rule.id);
   }
 
-  /** Ejecuta una regla directamente (votaciones, modo caos), sin revisar disparador ni cooldowns. */
-  runRule(id, event) {
+  /**
+   * Ejecuta una regla directamente (votaciones, modo caos), sin revisar disparador ni cooldowns.
+   * target: 'random' | 'all' | 'me' para ignorar el objetivo de la regla (modo caos).
+   */
+  runRule(id, event, { target } = {}) {
     const rule = this.rules.find((r) => r.id === id);
     if (!rule) return false;
     log.event(`${event.platform} → regla "${id}" (${this.ruleLabel(id)})`);
-    return this.enqueueRule(rule, event, id);
+    return this.enqueueRule(rule, event, id, null, target ?? null);
   }
 
   /** Avisa del cooldown una sola vez por usuario y regla mientras dure la espera (evita spam). */

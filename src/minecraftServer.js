@@ -2,20 +2,23 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { log } from './core/logger.js';
+import { detectInstallation, prepareInstallation, readRconPassword } from './installations.js';
 
 const MAX_LINES = 1000;
 const ANSI = /\u001b\[[0-9;?]*[ -\/]*[@-~]/g;
 
 /**
- * Arranca y controla el servidor de Minecraft (Paper) como proceso hijo:
+ * Arranca y controla el servidor de Minecraft (Paper, Vanilla, Fabric, NeoForge o Forge) como proceso hijo:
  * consola en vivo, comandos por stdin, apagado limpio con "stop"
  * y reinicio automático si se cae (igual que el start.bat).
  *
  * Estados: stopped | starting | running | stopping | crashed | external
  */
 export class MinecraftServer {
-  constructor({ dir, java = 'java', memoryMin = '2G', memoryMax = '4G', extraArgs = '', autoRestart = true, onRconReady }) {
+  constructor({ dir, java = 'java', memoryMin = '2G', memoryMax = '4G', extraArgs = '', autoRestart = true, onRconReady, rcon }) {
     this.dir = dir;
+    this.installation = null; // { id, name } de la instalación activa
+    this.rcon = rcon;         // { port, password } para dejar server.properties listo
     this.java = java;
     this.memoryMin = memoryMin;
     this.memoryMax = memoryMax;
@@ -31,27 +34,35 @@ export class MinecraftServer {
     this.stopRequested = false;
     this.crashes = [];
     this.restartTimer = null;
+    this.restarting = false;
+    this.onStopped = null;   // se llama al detenerlo a propósito (no al reiniciar ni si se cae)
+    this.startGuard = null;  // () => motivo para no dejar arrancar, o null
   }
 
   get configured() {
     return Boolean(this.dir);
   }
 
-  get jarPath() {
-    if (!this.dir) return null;
-    try {
-      const jars = fs.readdirSync(this.dir).filter((f) => f.toLowerCase().endsWith('.jar'));
-      const jar = jars.find((f) => f.toLowerCase() === 'paper.jar') ?? jars.find((f) => /paper/i.test(f)) ?? jars[0];
-      return jar ? path.join(this.dir, jar) : null;
-    } catch {
-      return null;
-    }
+  /** Cambia la instalación que se arranca (solo con el servidor apagado). */
+  setInstallation(inst) {
+    if (this.proc) throw httpError(409, 'Detén el servidor antes de cambiar de instalación');
+    if (this.state === 'external') throw httpError(409, 'Hay un servidor corriendo fuera de la app. Ciérralo antes de cambiar de instalación.');
+    clearTimeout(this.restartTimer);
+    this.dir = inst.dir;
+    this.java = inst.java;
+    this.memoryMin = inst.memoryMin;
+    this.memoryMax = inst.memoryMax;
+    this.extraArgs = inst.extraArgs ?? '';
+    this.installation = { id: inst.id, name: inst.name };
+    this.crashes = [];
+    if (this.state === 'crashed') this.state = 'stopped';
   }
 
   status() {
     return {
       configured: this.configured,
       dir: this.dir,
+      installation: this.installation,
       state: this.state,
       startedAt: this.startedAt,
       pid: this.proc?.pid ?? null,
@@ -67,23 +78,30 @@ export class MinecraftServer {
   }
 
   start() {
-    if (!this.configured) throw httpError(400, 'Configura MC_SERVER_DIR en el .env con la carpeta del servidor');
+    if (!this.configured) throw httpError(400, 'Agrega una instalación del servidor en la página Instalaciones');
     if (this.proc) throw httpError(409, 'El servidor ya está corriendo');
     if (this.state === 'external') throw httpError(409, 'Ya hay un servidor corriendo fuera de la app (¿start.bat?). Ciérralo primero.');
-    const jar = this.jarPath;
-    if (!jar) throw httpError(400, `No encontré ningún .jar en ${this.dir}`);
+    const blocked = this.startGuard?.();
+    if (blocked) throw httpError(409, blocked);
+    const info = detectInstallation(this.dir);
+    if (!info.exists) throw httpError(400, `No existe la carpeta ${this.dir}`);
+    if (!info.launch) throw httpError(400, `No encontré un servidor en ${this.dir} (ni un .jar ni una instalación de NeoForge/Forge)`);
+    if (!info.eula) throw httpError(400, 'Falta aceptar el EULA de Minecraft en esta instalación (en la página Instalaciones → Editar).');
+    if (this.rcon) prepareInstallation(this.dir, { rconPort: this.rcon.port, rconPassword: this.rcon.password });
 
     clearTimeout(this.restartTimer);
     this.stopRequested = false;
-    const args = [
-      `-Xms${this.memoryMin}`,
-      `-Xmx${this.memoryMax}`,
-      '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8', '-Dfile.encoding=UTF-8',
-      ...this.extraArgs.split(/\s+/).filter(Boolean),
-      '-jar', path.basename(jar), 'nogui'
-    ];
-
-    this.#push('app', `▶ Iniciando: ${this.java} ${args.join(' ')}`);
+    const memory = [`-Xms${this.memoryMin}`, `-Xmx${this.memoryMax}`];
+    const common = ['-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8', '-Dfile.encoding=UTF-8', ...this.extraArgs.split(/\s+/).filter(Boolean)];
+    let args;
+    if (info.launch.kind === 'args') {
+      // Igual que el run.bat de NeoForge/Forge; la memoria va después de user_jvm_args.txt para que gane la del panel
+      const userArgs = fs.existsSync(path.join(this.dir, 'user_jvm_args.txt')) ? ['@user_jvm_args.txt'] : [];
+      args = [...userArgs, ...memory, ...common, `@${info.launch.args}`, 'nogui'];
+    } else {
+      args = [...memory, ...common, '-jar', info.launch.jar, 'nogui'];
+    }
+    this.#push('app', `▶ Iniciando ${this.installation?.name ?? 'servidor'} (${info.label}${info.version ? ` ${info.version}` : ''}): ${this.java} ${args.join(' ')}`);
     this.state = 'starting';
     this.startedAt = new Date().toISOString();
 
@@ -103,7 +121,7 @@ export class MinecraftServer {
     proc.stderr.on('data', onData('err'));
 
     proc.on('error', (err) => {
-      const msg = err.code === 'ENOENT' ? `No se encontró "${this.java}". ¿Está Java instalado y en el PATH? (o define MC_JAVA en el .env)` : err.message;
+      const msg = err.code === 'ENOENT' ? `No se encontró "${this.java}". ¿Está Java instalado y en el PATH? (o elige su java.exe en la página Instalaciones)` : err.message;
       this.#push('app', `❌ ${msg}`);
       log.error(`Servidor de Minecraft: ${msg}`);
     });
@@ -134,7 +152,8 @@ export class MinecraftServer {
   }
 
   async restart() {
-    await this.stop();
+    this.restarting = true;
+    try { await this.stop(); } finally { this.restarting = false; }
     this.start();
   }
 
@@ -164,6 +183,12 @@ export class MinecraftServer {
       log.info('⛏️  Servidor de Minecraft listo');
     }
     if (/RCON running on/.test(text)) {
+      const pass = this.rcon ? readRconPassword(this.dir) : null;
+      if (pass !== null && pass !== this.rcon.password) {
+        const msg = 'La contraseña de RCON en server.properties no coincide con MC_RCON_PASSWORD del .env: el panel no podrá conectarse. Detén el servidor y vuelve a iniciarlo desde la app.';
+        this.#push('app', `⚠️ ${msg}`);
+        log.warn(msg);
+      }
       // Darle un momento a que RCON acepte conexiones
       setTimeout(() => this.onRconReady?.(), 1000);
     }
@@ -177,6 +202,7 @@ export class MinecraftServer {
     if (requested || code === 0) {
       this.state = 'stopped';
       log.info('⛏️  Servidor de Minecraft detenido');
+      if (!this.restarting) { try { this.onStopped?.(); } catch { /* no bloquear el apagado */ } }
       return;
     }
 

@@ -18,9 +18,15 @@
     }
   ],
   "chaos": {
-    "minSeconds": 120,
-    "maxSeconds": 300,
-    "ruleIds": []
+    "minSeconds": 15,
+    "maxSeconds": 20,
+    "ruleIds": [
+      "zombie",
+      "creeper",
+      "regla-1",
+      "skeleton",
+      "zombie-cmd"
+    ]
   },
   "overlay": {
     "autoAlerts": true,

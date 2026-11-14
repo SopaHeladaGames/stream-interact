@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { ACTIONS, MC_COLORS, TRIGGERS, VARIABLES } from '../rules.js';
+import { ACTIONS, MC_COLORS, TARGETS, TRIGGERS, VARIABLES } from '../rules.js';
 
 /** Convierte ms ↔ segundos para que en el formulario todo se vea en segundos. */
 const toSecs = (ms) => (ms == null ? '' : ms / 1000);
@@ -10,6 +10,9 @@ export default function RuleEditor({ rule, onChange }) {
   // Imágenes y sonidos subidos en Overlay OBS (para la acción "Alerta en overlay")
   const [mediaFiles, setMediaFiles] = useState([]);
   useEffect(() => { api.overlayArchivos().then(setMediaFiles).catch(() => {}); }, []);
+  // Reglas del mundo disponibles (para la acción "Regla del mundo")
+  const [gamerules, setGamerules] = useState([]);
+  useEffect(() => { api.catalogoGamerules().then(setGamerules).catch(() => {}); }, []);
 
   const t = rule.trigger ?? {};
   const set = (patch) => onChange({ ...rule, ...patch });
@@ -108,6 +111,8 @@ export default function RuleEditor({ rule, onChange }) {
         </div>
       </section>
 
+      <TargetSection rule={rule} set={set} />
+
       <section className="card">
         <div className="row between">
           <h3>Qué pasa</h3>
@@ -128,7 +133,7 @@ export default function RuleEditor({ rule, onChange }) {
               <button className="icon-btn" onClick={() => moveAction(i, 1)} disabled={i === actions.length - 1} title="Bajar">↓</button>
               <button className="icon-btn danger" onClick={() => setActions((as) => as.filter((_, j) => j !== i))} title="Quitar">✕</button>
             </div>
-            <ActionFields action={a} onChange={(next) => updateAction(i, next)} mediaFiles={mediaFiles} />
+            <ActionFields action={a} onChange={(next) => updateAction(i, next)} mediaFiles={mediaFiles} gamerules={gamerules} />
           </div>
         ))}
 
@@ -144,7 +149,7 @@ export default function RuleEditor({ rule, onChange }) {
   );
 }
 
-function ActionFields({ action, onChange, mediaFiles = [] }) {
+function ActionFields({ action, onChange, mediaFiles = [], gamerules = [] }) {
   const set = (patch) => onChange({ ...action, ...patch });
 
   switch (action.type) {
@@ -227,6 +232,58 @@ function ActionFields({ action, onChange, mediaFiles = [] }) {
           </label>
         </div>
       );
+    case 'gamerule': {
+      const gr = gamerules.find((r) => r.id === action.rule);
+      const groups = { chat: 'Chat', players: 'Jugadores', world: 'Mundo' };
+      return (
+        <>
+          <div className="field-row">
+            <label className="field grow">
+              <span>Regla</span>
+              <select value={action.rule ?? ''} onChange={(e) => {
+                const next = gamerules.find((r) => r.id === e.target.value);
+                set({ rule: e.target.value, value: next?.type === 'int' ? (next.min ?? 0) : false });
+              }}>
+                {Object.entries(groups).map(([g, title]) => (
+                  <optgroup key={g} label={title}>
+                    {gamerules.filter((r) => r.group === g).map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            {gr?.type === 'int' ? (
+              <label className="field narrow">
+                <span>Valor ({gr.min}–{gr.max})</span>
+                <input type="number" min={gr.min} max={gr.max} value={action.value ?? 0} onChange={(e) => set({ value: Number(e.target.value) })} />
+              </label>
+            ) : (
+              <label className="field narrow">
+                <span>Dejarla</span>
+                <select value={String(action.value === true)} onChange={(e) => set({ value: e.target.value === 'true' })}>
+                  <option value="false">Desactivada</option>
+                  <option value="true">Activada</option>
+                </select>
+              </label>
+            )}
+            <label className="field narrow">
+              <span>Durante (s)</span>
+              <input type="number" min="0" max="86400" value={action.seconds ?? 0} onChange={(e) => set({ seconds: Math.max(0, Number(e.target.value)) })} />
+            </label>
+          </div>
+          <div className="field-row">
+            <label className="field grow">
+              <span>Mensaje en Minecraft cuando termine (opcional)</span>
+              <input value={action.endMessage ?? ''} onChange={(e) => set({ endMessage: e.target.value })} placeholder={`${gr?.label ?? 'La regla'}: volvió a la normalidad`} />
+            </label>
+          </div>
+          <p className="muted small field-note">
+            {Number(action.seconds) > 0
+              ? `Después de ${formatDuration(action.seconds)} vuelve sola a como estaba. Si se vuelve a activar antes, el tiempo se suma.`
+              : 'Con 0 segundos el cambio es permanente.'}
+          </p>
+        </>
+      );
+    }
     case 'wait':
       return (
         <label className="field narrow">
@@ -251,4 +308,56 @@ function ColorField({ value, onChange }) {
       </div>
     </label>
   );
+}
+
+/** A quién le llega la regla cuando juegas con más gente. */
+function TargetSection({ rule, set }) {
+  const mode = rule.target ?? 'me';
+  const type = rule.trigger?.type;
+  const usesPlayer = (rule.actions ?? []).some((a) => a.type === 'minecraft' && (a.commands ?? []).some((c) => c.includes('{player}')));
+  const usesTarget = (rule.actions ?? []).some((a) => a.type === 'minecraft' && (a.commands ?? []).some((c) => c.includes('{target}')));
+
+  // Cambia {player} por {target} en comandos y también en los textos (mensajes, títulos, chat, overlay)
+  const swapText = (v) => (typeof v === 'string' ? v.replaceAll('{player}', '{target}') : Array.isArray(v) ? v.map(swapText) : v);
+  const swap = () => set({
+    actions: rule.actions.map((a) => Object.fromEntries(Object.entries(a).map(([k, v]) => [k, k === 'type' ? v : swapText(v)])))
+  });
+
+  return (
+    <section className="card">
+      <h3>A quién le llega</h3>
+      <div className="segmented wide">
+        {Object.entries(TARGETS).map(([id, info]) => (
+          <button key={id} className={mode === id ? 'active' : ''} title={info.hint} onClick={() => set({ target: id === 'me' ? undefined : id })}>{info.label}</button>
+        ))}
+      </div>
+      <p className="muted small target-hint">
+        {mode === 'me' && 'Siempre a ti. En los comandos puedes usar {player} o {target}.'}
+        {mode === 'chat' && <>
+          {type === 'reward' && <>El espectador escribe el nombre al canjear. En <strong>Recompensas</strong> activa “Pedir texto al espectador” y en la descripción pon algo como “¿A quién? (Many, SopaHelada…)”. </>}
+          {type === 'command' && <>El espectador escribe el nombre después del comando, por ejemplo <code>{rule.trigger?.name || '!comando'} Many</code>. Sin nombre te toca a ti. </>}
+          {(type === 'cheer' || type === 'donation') && <>Se busca un nombre en el mensaje del {type === 'cheer' ? 'cheer' : 'donativo'}; si no hay uno válido te toca a ti (nunca se pierde un {type === 'cheer' ? 'cheer' : 'donativo'}). </>}
+          {(type === 'reward' || type === 'command') && 'Si el jugador no está conectado o está protegido, no se ejecuta, se le avisa en el chat y se devuelven los puntos.'}
+        </>}
+        {mode === 'random' && 'Se elige al ejecutarse, entre los conectados que no estén protegidos (tú incluido).'}
+        {mode === 'all' && 'A todos los conectados menos los protegidos. En los textos, {target} se lee como “todos”.'}
+      </p>
+      {mode !== 'me' && usesPlayer && (
+        <div className="banner warn target-warn">
+          <span>Los comandos de esta regla usan <code>{'{player}'}</code>, que siempre eres tú. Para que le llegue al jugador elegido usa <code>{'{target}'}</code>.</span>
+          <button className="btn small" onClick={swap}>Cambiar {'{player}'} por {'{target}'}</button>
+        </div>
+      )}
+      {mode !== 'me' && !usesPlayer && !usesTarget && (rule.actions ?? []).some((a) => a.type === 'minecraft') && (
+        <p className="muted small">Escribe <code>{'{target}'}</code> en los comandos donde va el jugador, por ejemplo <code>give {'{target}'} minecraft:diamond 1</code>.</p>
+      )}
+    </section>
+  );
+}
+
+function formatDuration(secs) {
+  const s = Math.round(Number(secs) || 0);
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  return s % 60 ? `${m} min ${s % 60} s` : `${m} min`;
 }

@@ -2,8 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { log } from './core/logger.js';
+
+// Archivos de la app (solo lectura): en el instalador viven dentro del programa, no en tu carpeta de datos
+const APP_ROOT = process.env.STREAM_INTERACT_ROOT || process.cwd();
 import { chatFeed } from './core/chatFeed.js';
 import { overlayFeed } from './core/overlayFeed.js';
+import { PlayerManager } from './minecraftPlayers.js';
+import { detectInstallation, detectJavas, javaVersion } from './installations.js';
+import { GAMERULES } from './gamerules.js';
 
 /**
  * Servidor local: login de Twitch, API del panel y el panel ya compilado.
@@ -301,7 +307,7 @@ export function registerOverlayRoutes(app, { gameStore }) {
   }));
 
   // La página del overlay (archivos estáticos en /overlay)
-  const dir = path.resolve('overlay');
+  const dir = path.join(APP_ROOT, 'overlay');
   app.get('/overlay', (_req, res) => res.sendFile(path.join(dir, 'index.html')));
   app.use('/overlay', express.static(dir));
 }
@@ -317,8 +323,92 @@ export function registerDonationRoutes(app, { donations }) {
 }
 
 /** Control del servidor de Minecraft desde el panel. */
-export function registerServerRoutes(app, { mcServer, mc }) {
+/** Estadísticas de lo que hizo el chat. */
+export function registerStatsRoutes(app, { history }) {
+  const opts = (q) => ({ range: q.range ?? 'session', from: q.from, to: q.to, tests: q.tests === '1' });
+  app.get('/api/estadisticas', route((req) => history.stats(opts(req.query))));
+  app.get('/api/estadisticas/csv', route((req, res) => {
+    const name = `historial-${req.query.range ?? 'session'}-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+    res.send(history.csv(opts(req.query)));
+  }));
+}
+
+export function registerServerRoutes(app, { mcServer, mc, installations, backups, targets, gamerules, pickFolder, openPath }) {
+  // ---------- Jugadores que el chat puede elegir (apodos y protegidos) ----------
+  app.get('/api/jugadores-chat', route(() => targets.get()));
+  app.put('/api/jugadores-chat', route((req) => targets.update(req.body ?? {})));
+
   app.get('/api/servidor', route(() => ({ ...mcServer.status(), rcon: mc.connected })));
+
+  // ---------- Reglas del mundo (/gamerule) ----------
+  let lastInstallation = mcServer.installation?.id;
+  app.get('/api/gamerules', route(async () => {
+    // Otra instalación puede ser otra versión: volver a detectar los nombres
+    if (mcServer.installation?.id !== lastInstallation) { lastInstallation = mcServer.installation?.id; gamerules.reset(); }
+    return { ...(await gamerules.list()), temporaries: gamerules.temporaries() };
+  }));
+  app.get('/api/gamerules/catalogo', route(() => GAMERULES.map(({ id, label, type, min, max, group }) => ({ id, label, type, min, max, group }))));
+  app.get('/api/gamerules/temporales', route(() => gamerules.temporaries()));
+  app.post('/api/gamerules/terminar', route((req) => gamerules.endNow(req.body?.id)));
+  app.post('/api/gamerules', route((req) => gamerules.set(req.body?.id, req.body?.value)));
+
+  // ---------- Respaldos ----------
+  app.get('/api/respaldos', route(() => ({ ...backups.status(), canOpen: Boolean(openPath), canPick: Boolean(pickFolder) })));
+  app.post('/api/respaldos/ahora', route(async () => { await backups.backup('manual'); return backups.status(); }));
+  app.post('/api/respaldos/restaurar', route(async (req) => { await backups.restore(req.body?.file); return backups.status(); }));
+  app.delete('/api/respaldos/:file', route((req) => backups.remove(req.params.file)));
+  app.put('/api/respaldos/ajustes', route((req) => backups.updateSettings(req.body ?? {})));
+  app.post('/api/respaldos/abrir-carpeta', route(async () => {
+    if (!openPath) throw Object.assign(new Error('Solo funciona dentro de la app de escritorio'), { status: 400 });
+    const folder = backups.status().folder;
+    if (!folder) throw Object.assign(new Error('No hay una instalación activa'), { status: 400 });
+    fs.mkdirSync(folder, { recursive: true });
+    await openPath(folder);
+    return { ok: true };
+  }));
+  app.post('/api/respaldos/elegir-carpeta', route(async () => {
+    if (!pickFolder) throw Object.assign(new Error('Solo funciona dentro de la app de escritorio. Pega la ruta a mano.'), { status: 400 });
+    return { dir: await pickFolder() };
+  }));
+
+  // ---------- Instalaciones ----------
+  const activate = (id) => {
+    if (backups?.busy) throw Object.assign(new Error('Espera a que termine el respaldo en curso'), { status: 409 });
+    mcServer.setInstallation(installations.effective(installations.get(id))); // falla si está encendido
+    installations.setActive(id);
+  };
+  app.get('/api/instalaciones', route(() => ({ ...installations.list(), server: { state: mcServer.state, rcon: mc.connected }, canPick: Boolean(pickFolder) })));
+  app.get('/api/instalaciones/java', route(() => ({ found: detectJavas() })));
+  app.post('/api/instalaciones/java/version', route(async (req) => ({ version: await javaVersion(String(req.body?.java || 'java')) })));
+  app.post('/api/instalaciones/revisar', route((req) => detectInstallation(String(req.body?.dir ?? '').trim().replace(/^"|"$/g, ''))));
+  app.post('/api/instalaciones/elegir-carpeta', route(async () => {
+    if (!pickFolder) throw Object.assign(new Error('Elegir carpeta solo funciona dentro de la app de escritorio. Pega la ruta a mano.'), { status: 400 });
+    return { dir: await pickFolder() };
+  }));
+  app.post('/api/instalaciones', route((req) => installations.add(req.body ?? {})));
+  app.put('/api/instalaciones/:id', route((req) => {
+    const item = installations.update(req.params.id, req.body ?? {});
+    // Si es la activa y el servidor está apagado, aplicar los cambios de una vez
+    if (installations.data.active === item.id && !mcServer.proc && mcServer.state !== 'external') mcServer.setInstallation(installations.effective(item));
+    return item;
+  }));
+  app.delete('/api/instalaciones/:id', route((req) => { installations.remove(req.params.id); return { ok: true }; }));
+  app.post('/api/instalaciones/:id/activar', route(async (req) => {
+    activate(req.params.id);
+    if (req.body?.start) mcServer.start();
+    return { ...installations.list(), server: { state: mcServer.state, rcon: mc.connected } };
+  }));
+
+  // Red local, jugadores conectados y lista blanca (por RCON)
+  const players = new PlayerManager({ mc, getDir: () => mcServer.dir });
+  app.get('/api/servidor/red', route(() => players.network()));
+  app.post('/api/servidor/direccion-publica', route((req) => players.setPublicAddress(req.body?.address)));
+  app.get('/api/servidor/jugadores', route(() => players.players()));
+  app.post('/api/servidor/jugadores/expulsar', route((req) => players.kick(req.body?.name, req.body?.reason)));
+  app.get('/api/servidor/whitelist', route(() => players.whitelist()));
+  app.post('/api/servidor/whitelist', route((req) => players.whitelistAction(req.body?.action, req.body?.name)));
 
   app.post('/api/servidor/iniciar', route(() => { mcServer.start(); return mcServer.status(); }));
   app.post('/api/servidor/detener', route(async () => { await mcServer.stop(); return mcServer.status(); }));
@@ -347,7 +437,7 @@ export function registerServerRoutes(app, { mcServer, mc }) {
 
 /** Sirve el panel compilado (panel/dist). Se registra al final, después de /api y /auth. */
 export function servePanel(app) {
-  const dist = path.resolve('panel', 'dist');
+  const dist = path.join(APP_ROOT, 'panel', 'dist');
   if (!fs.existsSync(path.join(dist, 'index.html'))) {
     app.get('/', (_req, res) => res.type('html').send(
       '<h2>stream-interact</h2><p>El panel no está compilado. Ejecuta <code>npm run panel:build</code> ' +

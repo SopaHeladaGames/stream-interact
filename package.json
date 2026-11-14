@@ -1,6 +1,6 @@
 {
   "name": "stream-interact",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Permite que el chat de tus directos (Twitch, luego Kick/YouTube) interactúe con tu juego.",
   "type": "module",
   "main": "electron/main.js",
@@ -12,7 +12,9 @@
     "panel:dev": "npm --prefix panel run dev",
     "panel:build": "npm --prefix panel run build",
     "desktop": "electron .",
-    "desktop:dev": "electron . --dev"
+    "desktop:dev": "electron . --dev",
+    "dist": "npm run panel:build && electron-builder --win nsis",
+    "publicar": "node scripts/publicar.js"
   },
   "engines": {
     "node": ">=20"
@@ -22,11 +24,58 @@
     "@twurple/auth": "^8.2.0",
     "@twurple/eventsub-ws": "^8.2.0",
     "dotenv": "^17.2.3",
+    "electron-updater": "^6.8.11",
     "express": "^5.1.0",
     "rcon-client": "^4.2.5",
     "ws": "^8.23.0"
   },
   "devDependencies": {
-    "electron": "^45.3.0"
+    "electron": "^45.3.0",
+    "electron-builder": "^26.0.12"
+  },
+  "author": "SopaHeladaGames",
+  "build": {
+    "appId": "com.sopahelada.streaminteract",
+    "productName": "stream-interact",
+    "copyright": "SopaHeladaGames",
+    "directories": {
+      "output": "dist-instalador"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "overlay/**/*",
+      "panel/dist/**/*",
+      "config/rules.json",
+      ".env.example",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "electron/assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "stream-interact",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "stream-interact-instalador-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "SopaHeladaGames",
+        "repo": "stream-interact",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SopaHeladaGames/stream-interact.git"
   }
 }

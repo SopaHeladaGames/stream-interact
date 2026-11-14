@@ -17,7 +17,7 @@
         {
           "type": "minecraft",
           "commands": [
-            "execute at {player} run summon minecraft:zombie ~3 ~ ~3"
+            "execute at {target} run summon minecraft:zombie ~3 ~ ~3"
           ]
         },
         {
@@ -27,7 +27,7 @@
         },
         {
           "type": "chat",
-          "message": "🧟 {user} invocó un zombie a {player}"
+          "message": "🧟 {user} invocó un zombie a {target}"
         }
       ]
     },
@@ -52,12 +52,12 @@
         {
           "type": "minecraft",
           "commands": [
-            "execute at {player} run summon minecraft:creeper ~-2 ~ ~-2"
+            "execute at {target} run summon minecraft:creeper ~-2 ~ ~-2"
           ]
         },
         {
           "type": "chat",
-          "message": "💥 {user} soltó un creeper junto a {player}"
+          "message": "💥 {user} soltó un creeper junto a {target}"
         }
       ]
     },
@@ -94,12 +94,12 @@
         {
           "type": "minecraft",
           "commands": [
-            "execute at {player} run summon minecraft:zombie ~3 ~ ~3"
+            "execute at {target} run summon minecraft:zombie ~3 ~ ~3 {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b}"
           ]
         },
         {
           "type": "announce",
-          "text": "{user} te mandó un zombie",
+          "text": "{user} invocó un zombie cerca de ti",
           "color": "green"
         }
       ]
@@ -187,7 +187,7 @@
         {
           "type": "minecraft",
           "commands": [
-            "execute at {player} run summon minecraft:skeleton ~3 ~ ~3"
+            "execute at {target} run summon minecraft:skeleton ~3 ~ ~3"
           ]
         },
         {
@@ -267,7 +267,7 @@
         {
           "type": "minecraft",
           "commands": [
-            "effect give {player} minecraft:hunger 300 1"
+            "effect give {target} minecraft:hunger 300 1"
           ]
         }
       ]
@@ -292,6 +292,28 @@
           ]
         }
       ]
+    },
+    {
+      "id": "zombie2",
+      "trigger": {
+        "type": "command",
+        "name": "!zombie2"
+      },
+      "cooldownMs": 1000,
+      "actions": [
+        {
+          "type": "announce",
+          "text": "{user} le mandó un chombie a {target}",
+          "color": "yellow"
+        },
+        {
+          "type": "minecraft",
+          "commands": [
+            "execute at {target} run summon minecraft:zombie ~3 ~ ~3"
+          ]
+        }
+      ],
+      "target": "chat"
     }
   ]
 }

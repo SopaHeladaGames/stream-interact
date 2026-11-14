@@ -1,0 +1,46 @@
+# Crea el instalador de Windows y lo publica en GitHub Releases cuando subes un tag vX.Y.Z.
+# La app instalada revisa esas Releases y se actualiza sola.
+#
+#   npm run publicar            → sube la versión (0.2.0 → 0.2.1), hace commit, tag y push
+#   npm run publicar -- minor   → 0.2.1 → 0.3.0
+#   npm run publicar -- 1.0.0   → versión exacta
+name: Publicar versión
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write   # para crear la Release y subir el instalador
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            panel/package-lock.json
+
+      # La versión del instalador sale del tag (v0.2.0 → 0.2.0)
+      - name: Versión desde el tag
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+
+      - name: Dependencias
+        run: |
+          npm ci
+          npm --prefix panel ci
+
+      - name: Compilar panel
+        run: npm run panel:build
+
+      - name: Crear instalador y publicar
+        run: npx electron-builder --win nsis --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -103,7 +103,7 @@ export function announceAction(mc) {
 export function titleAction(mc) {
   return async (action, vars) => {
     const color = action.color ?? 'white';
-    const target = vars.player;
+    const target = vars.titleTarget ?? vars.player; // a quien le tocó la regla (o a ti)
     if (action.subtitle) {
       const sub = { text: stripEmojis(fill(action.subtitle, vars)), color: action.subtitleColor ?? 'white' };
       await mc.send(`title ${target} subtitle ${JSON.stringify(sub)}`);

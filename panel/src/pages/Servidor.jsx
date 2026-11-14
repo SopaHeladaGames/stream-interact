@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, subscribeConsole } from '../api.js';
+import ServidorJugadores from '../components/ServidorJugadores.jsx';
+import ServidorRespaldos from '../components/ServidorRespaldos.jsx';
+import ServidorGamerules from '../components/ServidorGamerules.jsx';
 
 const STATE = {
   stopped: { label: 'Detenido', dot: 'off' },
@@ -10,13 +13,14 @@ const STATE = {
   external: { label: 'Corriendo fuera de la app', dot: 'ok' }
 };
 
-export default function Servidor() {
+export default function Servidor({ go }) {
   const [status, setStatus] = useState(null);
   const [lines, setLines] = useState([]);
   const [command, setCommand] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [installs, setInstalls] = useState(null);
   const consoleRef = useRef(null);
   const historyRef = useRef({ list: [], index: -1 });
 
@@ -27,6 +31,13 @@ export default function Servidor() {
     const id = setInterval(tick, 1500);
     return () => { alive = false; clearInterval(id); };
   }, []);
+
+  useEffect(() => { api.instalaciones().then(setInstalls).catch(() => {}); }, [status?.installation?.id]);
+
+  const switchTo = async (id) => {
+    setBusy(true); setError(null);
+    try { setInstalls(await api.activarInstalacion(id)); setStatus(await api.servidor()); } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
 
   useEffect(() => subscribeConsole((entry) =>
     setLines((l) => (l.some((e) => e.id === entry.id) ? l : [...l, entry].slice(-1000)))), []);
@@ -74,11 +85,24 @@ export default function Servidor() {
         </div>
       </div>
 
+      <div className="install-bar">
+        <span className="muted small">Instalación</span>
+        {installs?.items?.length > 0 ? (
+          <select className="install-select" value={installs.active ?? ''} disabled={busy || owned || s === 'external'}
+            title={owned || s === 'external' ? 'Detén el servidor para cambiar de instalación' : 'Instalación que se arranca'}
+            onChange={(e) => switchTo(e.target.value)}>
+            {installs.items.map((i) => <option key={i.id} value={i.id}>{i.name} · {i.info.label}{i.info.version ? ` ${i.info.version}` : ''}</option>)}
+          </select>
+        ) : <span className="muted small">ninguna</span>}
+        <button className="btn small ghost" onClick={() => go?.('instalaciones')}>Administrar instalaciones</button>
+        {(owned || s === 'external') && <span className="muted small">Detén el servidor para cambiar de instalación.</span>}
+      </div>
+
       {error && <div className="banner error" onClick={() => setError(null)}>{error}</div>}
       {status && !status.configured && (
         <div className="banner warn">
-          Para controlar el servidor desde aquí, agrega a tu <code>.env</code> la línea{' '}
-          <code>MC_SERVER_DIR=C:\Users\vitro\dev\mc-server</code> y reinicia la app.
+          Para controlar el servidor desde aquí, agrega la carpeta de tu servidor en{' '}
+          <a href="#instalaciones" onClick={(e) => { e.preventDefault(); go?.('instalaciones'); }}>Instalaciones</a>.
         </div>
       )}
       {s === 'external' && (
@@ -106,6 +130,12 @@ export default function Servidor() {
           <div className="card-detail">{status?.autoRestart ? 'Si se cae, se levanta en 10 s' : 'Desactivado'}</div>
         </div>
       </div>
+
+      <ServidorJugadores rcon={Boolean(status?.rcon)} />
+
+      <ServidorRespaldos serverState={s} />
+
+      <ServidorGamerules rcon={Boolean(status?.rcon)} />
 
       <div className="section-head">
         <h2>Consola</h2>

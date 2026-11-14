@@ -3,17 +3,29 @@
 //
 //   npm run desktop        → usa el panel compilado (panel/dist)
 //   npm run desktop:dev    → usa el panel de Vite en :5173 (recarga en caliente)
+//   npm run dist           → crea el instalador de Windows (dist-instalador/)
+//
+// Instalada, la app separa sus archivos (dentro del programa, solo lectura) de tus datos
+// (.env, config/, data/, media/), que viven en la carpeta que elijas la primera vez.
 import { app, BrowserWindow, Tray, Menu, globalShortcut, Notification, shell, nativeImage, dialog } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import updaterPkg from 'electron-updater';
+
+const { autoUpdater } = updaterPkg;
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = path.join(ROOT, 'electron', 'assets');
 const DEV = process.argv.includes('--dev');
 const APP_NAME = 'stream-interact';
 
-// El backend busca .env, config/, data/ y panel/ desde la carpeta de trabajo
-process.chdir(ROOT);
+const HIDDEN = process.argv.includes('--oculto'); // al arrancar con Windows: directo a la bandeja
+
+// Archivos de la app (overlay, panel compilado): el backend los busca aquí
+process.env.STREAM_INTERACT_ROOT = ROOT;
+// Tus datos: en desarrollo, la carpeta del proyecto; instalada, la que elijas (se decide en boot)
+let DATA_DIR = ROOT;
 app.setName(APP_NAME);
 if (process.platform === 'win32') app.setAppUserModelId('com.sopahelada.streaminteract');
 
@@ -36,11 +48,28 @@ let lastMenuSignature = null;
 
 async function boot() {
   Menu.setApplicationMenu(null);
+  if (app.isPackaged) {
+    DATA_DIR = await resolveDataDir();
+    if (!DATA_DIR) { app.exit(0); return; }
+  }
+  // El backend busca .env, config/, data/ y media/ desde la carpeta de trabajo
+  process.chdir(DATA_DIR);
   try {
     const { startApp } = await import(pathToFileURL(path.join(ROOT, 'src', 'app.js')).href);
-    backend = await startApp();
+    backend = await startApp({
+      // Selector de carpetas nativo para la página Instalaciones
+      pickFolder: async () => {
+        const res = await dialog.showOpenDialog(win ?? undefined, { title: 'Carpeta del servidor de Minecraft', properties: ['openDirectory'] });
+        return res.canceled ? null : res.filePaths[0];
+      },
+      // Abrir una carpeta en el Explorador (respaldos)
+      openPath: (p) => shell.openPath(p),
+      // Actualizaciones (solo en la versión instalada): el panel muestra el aviso y el botón
+      updates: { status: () => ({ current: app.getVersion(), packaged: app.isPackaged, state: update.state, newVersion: update.version, progress: update.progress, error: update.error }), install: installUpdate, check: () => checkForUpdates(true) }
+    });
   } catch (err) {
-    dialog.showErrorBox('No se pudo iniciar stream-interact', `${err.message}\n\nRevisa tu archivo .env en:\n${ROOT}`);
+    dialog.showErrorBox('No se pudo iniciar stream-interact', `${err.message}\n\nRevisa tu archivo .env en:\n${DATA_DIR}`);
+    if (app.isPackaged) shell.openPath(DATA_DIR);
     app.exit(1);
     return;
   }
@@ -49,6 +78,55 @@ async function boot() {
   createWindow();
   registerShortcut();
   setInterval(refreshTray, 1500);
+  setupUpdates();
+}
+
+// ---------- Actualizaciones automáticas (GitHub Releases) ----------
+//
+// La versión instalada revisa al abrir y cada 4 horas si hay una versión nueva en
+// github.com/SopaHeladaGames/stream-interact/releases. La descarga sola en segundo plano y:
+//   - te avisa (notificación, bandeja y panel) con un botón para reiniciar y actualizar, o
+//   - se instala sola la próxima vez que salgas de la app.
+// Nunca reinicia sola: tú decides cuándo (por ejemplo, no a mitad de un directo).
+
+const update = { state: 'idle', version: null, progress: 0, error: null };
+
+function setupUpdates() {
+  if (!app.isPackaged) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = false; // lo hacemos nosotros al salir, después de apagar el servidor
+  autoUpdater.on('checking-for-update', () => Object.assign(update, { state: 'checking', error: null }));
+  autoUpdater.on('update-not-available', () => Object.assign(update, { state: 'none' }));
+  autoUpdater.on('update-available', (info) => Object.assign(update, { state: 'downloading', version: info.version, progress: 0 }));
+  autoUpdater.on('download-progress', (p) => { update.progress = Math.round(p.percent); });
+  autoUpdater.on('update-downloaded', (info) => {
+    Object.assign(update, { state: 'ready', version: info.version, progress: 100 });
+    notify(`Versión ${info.version} lista`, 'Reinicia la app cuando quieras para actualizar (o se instala al salir).');
+    lastMenuSignature = null;
+    refreshTray();
+  });
+  autoUpdater.on('error', (err) => {
+    Object.assign(update, { state: 'error', error: err?.message ?? String(err) });
+    console.error('Actualizaciones:', update.error);
+  });
+  checkForUpdates();
+  setInterval(checkForUpdates, 4 * 3600e3);
+}
+
+async function checkForUpdates(manual = false) {
+  if (!app.isPackaged) return { ...update, state: 'dev' };
+  if (update.state === 'downloading' || update.state === 'ready') return update;
+  try { await autoUpdater.checkForUpdates(); } catch (err) { Object.assign(update, { state: 'error', error: err.message }); }
+  if (manual && update.state === 'none') notify('Todo al día', `Tienes la versión más reciente (${app.getVersion()}).`);
+  return update;
+}
+
+let installOnQuit = false;
+function installUpdate() {
+  if (update.state !== 'ready') throw Object.assign(new Error('Todavía no hay una actualización descargada'), { status: 409 });
+  installOnQuit = 'restart';
+  app.quit(); // primero se apaga todo con calma (before-quit) y luego se instala
+  return { ok: true };
 }
 
 // ---------- Ventana ----------
@@ -82,7 +160,7 @@ function createWindow() {
       win.webContents.toggleDevTools();
     }
   });
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => { if (!HIDDEN) win.show(); });
 
   // Lo que no es el panel (login de Twitch, enlaces externos) se abre en tu navegador normal
   const isPanel = (url) => url.startsWith(appUrl) && !new URL(url).pathname.startsWith('/auth/');
@@ -142,12 +220,14 @@ function refreshTray() {
   tray.setToolTip(`${APP_NAME} — ${paused ? 'EN PAUSA' : 'activo'}${pending ? ` · ${pending} en cola` : ''}`);
 
   // Reconstruir el menú solo cuando algo cambia (si no, se cerraría mientras lo tienes abierto)
-  const signature = `${paused}|${server.state}|${server.configured}`;
+  const startup = app.isPackaged && app.getLoginItemSettings().openAtLogin;
+  const signature = `${paused}|${server.state}|${server.configured}|${startup}|${update.state}`;
   if (signature === lastMenuSignature) return;
   lastMenuSignature = signature;
 
   const owned = ['starting', 'running', 'stopping'].includes(server.state);
   tray.setContextMenu(Menu.buildFromTemplate([
+    ...(update.state === 'ready' ? [{ label: `⬆  Reiniciar y actualizar a ${update.version}`, click: () => safe(installUpdate) }, { type: 'separator' }] : []),
     { label: 'Abrir panel', click: showWindow },
     { label: 'Recargar panel', click: () => { win?.webContents.reloadIgnoringCache(); showWindow(); } },
     { type: 'separator' },
@@ -162,6 +242,16 @@ function refreshTray() {
         { label: 'Detener', enabled: owned && server.state !== 'stopping', click: () => safe(() => backend.mcServer.stop()) }
       ]
     },
+    { type: 'separator' },
+    { label: 'Abrir carpeta de datos', click: () => shell.openPath(DATA_DIR) },
+    ...(app.isPackaged ? [
+      {
+        label: 'Iniciar con Windows', type: 'checkbox', checked: startup,
+        click: (item) => { app.setLoginItemSettings({ openAtLogin: item.checked, args: ['--oculto'] }); lastMenuSignature = null; refreshTray(); }
+      },
+      { label: 'Cambiar carpeta de datos…', click: changeDataDir },
+      { label: `Buscar actualizaciones (versión ${app.getVersion()})`, click: () => checkForUpdates(true) }
+    ] : []),
     { type: 'separator' },
     { label: 'Salir', click: () => app.quit() }
   ]));
@@ -182,6 +272,76 @@ function togglePause() {
   notify(paused ? '▶ Interacciones reanudadas' : '⏸ Interacciones en pausa',
     paused ? 'El chat vuelve a controlar el juego.' : `Nada del chat se ejecuta. ${shortcut} para reanudar.`);
   refreshTray();
+}
+
+// ---------- Carpeta de datos (solo instalada) ----------
+
+const LOCATION_FILE = () => path.join(app.getPath('userData'), 'ubicacion.json');
+
+/** La carpeta guardada o, la primera vez, la que elijas. Devuelve null si cancelas. */
+async function resolveDataDir() {
+  try {
+    const { dataDir } = JSON.parse(fs.readFileSync(LOCATION_FILE(), 'utf8'));
+    if (dataDir && fs.existsSync(dataDir)) return dataDir;
+  } catch { /* primera vez */ }
+
+  while (true) {
+    const { response } = await dialog.showMessageBox({
+      type: 'question',
+      title: 'stream-interact',
+      message: '¿Dónde guardo tu configuración?',
+      detail: 'Aquí van tu .env, las reglas, el historial y la sesión de Twitch.\n\n' +
+        'Si ya usabas stream-interact desde una carpeta (por ejemplo C:\\Users\\…\\dev\\stream-interact), ' +
+        'elígela y la app usará exactamente la misma configuración.',
+      buttons: ['Usar una carpeta existente…', 'Crear una nueva', 'Salir'],
+      defaultId: 0, cancelId: 2, noLink: true
+    });
+    if (response === 2) return null;
+
+    if (response === 0) {
+      const res = await dialog.showOpenDialog({ title: 'Carpeta con tu .env', properties: ['openDirectory'] });
+      if (res.canceled) continue;
+      const dir = res.filePaths[0];
+      if (!fs.existsSync(path.join(dir, '.env'))) {
+        await dialog.showMessageBox({ type: 'warning', message: 'Esa carpeta no tiene un archivo .env', detail: dir, buttons: ['Elegir otra'] });
+        continue;
+      }
+      saveDataDir(dir);
+      return dir;
+    }
+
+    // Nueva: en Documentos, con las reglas de ejemplo y un .env para llenar
+    const dir = path.join(app.getPath('documents'), APP_NAME);
+    fs.mkdirSync(path.join(dir, 'config'), { recursive: true });
+    const copy = (from, to) => { if (!fs.existsSync(to) && fs.existsSync(from)) fs.copyFileSync(from, to); };
+    copy(path.join(ROOT, '.env.example'), path.join(dir, '.env'));
+    copy(path.join(ROOT, 'config', 'rules.json'), path.join(dir, 'config', 'rules.json'));
+    saveDataDir(dir);
+    await dialog.showMessageBox({
+      type: 'info', message: 'Llena tu archivo .env',
+      detail: `Creé la carpeta:\n${dir}\n\nAbre el archivo .env, llena tus datos de Twitch y Minecraft y vuelve a abrir la app.`,
+      buttons: ['Abrir la carpeta']
+    });
+    shell.openPath(dir);
+    return null;
+  }
+}
+
+function saveDataDir(dir) {
+  fs.mkdirSync(path.dirname(LOCATION_FILE()), { recursive: true });
+  fs.writeFileSync(LOCATION_FILE(), JSON.stringify({ dataDir: dir }, null, 2));
+}
+
+async function changeDataDir() {
+  const { response } = await dialog.showMessageBox({
+    type: 'question', message: '¿Cambiar la carpeta de datos?',
+    detail: `Ahora: ${DATA_DIR}\n\nLa app se reiniciará y te preguntará cuál usar. No se borra ni se mueve nada.`,
+    buttons: ['Cambiar', 'Cancelar'], defaultId: 0, cancelId: 1, noLink: true
+  });
+  if (response !== 0) return;
+  fs.rmSync(LOCATION_FILE(), { force: true });
+  app.relaunch();
+  app.quit();
 }
 
 // ---------- Utilidades ----------
@@ -205,6 +365,11 @@ app.on('before-quit', async (e) => {
   globalShortcut.unregisterAll();
   if (backend.mcServer.proc) notify('Cerrando…', 'Guardando el mundo y apagando el servidor de Minecraft.');
   try { await backend.stop(); } catch { /* salir de todos modos */ }
+  // Si hay una versión descargada, se instala al salir (en silencio). Con el botón, además, se vuelve a abrir.
+  if (update.state === 'ready') {
+    autoUpdater.quitAndInstall(true, installOnQuit === 'restart');
+    return;
+  }
   app.exit(0);
 });
 

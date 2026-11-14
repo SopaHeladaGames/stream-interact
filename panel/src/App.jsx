@@ -5,12 +5,15 @@ import Reglas from './pages/Reglas.jsx';
 import Probar from './pages/Probar.jsx';
 import Recompensas from './pages/Recompensas.jsx';
 import Servidor from './pages/Servidor.jsx';
+import Instalaciones from './pages/Instalaciones.jsx';
+import Estadisticas from './pages/Estadisticas.jsx';
 import ChatPanel from './pages/Chat.jsx';
 import Votaciones from './pages/Votaciones.jsx';
 import Caos from './pages/Caos.jsx';
 import Overlay from './pages/Overlay.jsx';
 import Donaciones from './pages/Donaciones.jsx';
 import PollWidget from './components/PollWidget.jsx';
+import UpdateBadge from './components/UpdateBadge.jsx';
 
 const PAGES = [
   { id: 'inicio', label: 'Inicio', icon: '◉' },
@@ -20,7 +23,9 @@ const PAGES = [
   { id: 'overlay', label: 'Overlay OBS', icon: '▢' },
   { id: 'donaciones', label: 'Donaciones', icon: '$' },
   { id: 'probar', label: 'Probar', icon: '▶' },
+  { id: 'estadisticas', label: 'Estadísticas', icon: '▥' },
   { id: 'servidor', label: 'Servidor', icon: '▣' },
+  { id: 'instalaciones', label: 'Instalaciones', icon: '▤' },
   { id: 'recompensas', label: 'Recompensas', icon: '★' }
 ];
 
@@ -118,6 +123,7 @@ export default function App() {
         >
           {estado?.paused ? '▶ Reanudar' : '⏸ Pausar todo'}
         </button>
+        <UpdateBadge />
       </aside>
 
       <main className="content">
@@ -133,7 +139,9 @@ export default function App() {
         {page === 'overlay' && <Overlay />}
         {page === 'donaciones' && <Donaciones />}
         {page === 'probar' && <Probar />}
-        {page === 'servidor' && <Servidor />}
+        {page === 'servidor' && <Servidor go={setPage} />}
+        {page === 'instalaciones' && <Instalaciones go={setPage} />}
+        {page === 'estadisticas' && <Estadisticas />}
         {page === 'recompensas' && <Recompensas conectado={estado?.twitch?.connected} />}
       </main>
 

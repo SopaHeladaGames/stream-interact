@@ -111,6 +111,9 @@ export class ChaosMode {
     const candidates = pool.length > 1 ? pool.filter((id) => id !== this.last?.ruleId) : pool;
     const ruleId = candidates[Math.floor(Math.random() * candidates.length)];
 
+    // A quién le toca: al azar entre los conectados, todos, o lo que diga cada regla
+    const mode = this.store.chaos.target ?? 'random';
+    const last = { ruleId, label: this.engine.ruleLabel(ruleId), at: new Date().toISOString(), target: null };
     const accepted = this.engine.runRule(ruleId, {
       platform: 'caos',
       chatPlatform: 'twitch',
@@ -118,11 +121,12 @@ export class ChaosMode {
       name: 'Modo caos',
       user: { id: 'caos', name: 'caos', displayName: 'El modo caos', isMod: false, isBroadcaster: false },
       amount: 0,
-      input: ''
-    });
+      input: '',
+      onTarget: (t) => { last.target = t.display; }
+    }, { target: mode === 'rule' ? undefined : mode });
     if (!accepted) return skip('La cola de acciones está llena');
 
-    this.last = { ruleId, label: this.engine.ruleLabel(ruleId), at: new Date().toISOString() };
+    this.last = last;
     this.lastSkip = null;
     return { ok: true };
   }

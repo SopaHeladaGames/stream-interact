@@ -18,7 +18,8 @@ const DEFAULTS = {
       ]
     }
   ],
-  chaos: { minSeconds: 120, maxSeconds: 300, ruleIds: [] },
+  // target: random (al azar entre los conectados, te incluye) | rule (lo que diga cada regla) | all (todos)
+  chaos: { minSeconds: 120, maxSeconds: 300, ruleIds: [], target: 'random' },
   overlay: OVERLAY_DEFAULTS
 };
 
@@ -57,7 +58,8 @@ function normalizeChaos(c) {
   if (!(maxSeconds >= minSeconds)) throw httpError(400, 'El intervalo máximo no puede ser menor que el mínimo');
   if (maxSeconds > 3600) throw httpError(400, 'El intervalo máximo es de 3600 segundos (1 hora)');
   const ruleIds = [...new Set((Array.isArray(c.ruleIds) ? c.ruleIds : []).map(String))];
-  return { minSeconds, maxSeconds, ruleIds };
+  const target = ['random', 'rule', 'all'].includes(c?.target) ? c.target : 'random';
+  return { minSeconds, maxSeconds, ruleIds, target };
 }
 
 function safeOverlay(o) {

@@ -2,6 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { TRIGGERS, describeTrigger } from '../rules.js';
 
+const CHAOS_TARGETS = {
+  random: { label: 'Al azar', hint: 'Cada evento le toca a alguien conectado al azar (tú incluido; nunca a los protegidos).' },
+  rule: { label: 'Lo que diga cada regla', hint: 'Cada regla usa su propio “A quién le llega” (página Reglas).' },
+  all: { label: 'Todos', hint: 'Cada evento le llega a todos los conectados (menos los protegidos).' }
+};
+
+// Una regla "fija" a ti: sus comandos usan {player} y ninguno {target}
+const usesOnlyPlayer = (r) => {
+  const cmds = (r.actions ?? []).filter((a) => a.type === 'minecraft').flatMap((a) => a.commands ?? []);
+  return cmds.some((c) => c.includes('{player}')) && !cmds.some((c) => c.includes('{target}'));
+};
+const swapText = (v) => (typeof v === 'string' ? v.replaceAll('{player}', '{target}') : Array.isArray(v) ? v.map(swapText) : v);
+
 const formatTime = (ms) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return s >= 60 ? `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s` : `${s}s`;
@@ -52,6 +65,20 @@ export default function Caos() {
     ruleIds: d.ruleIds.includes(id) ? d.ruleIds.filter((x) => x !== id) : [...d.ruleIds, id]
   }));
 
+  // Cambia {player} por {target} en las reglas elegidas para que el caos pueda mandárselas a otros
+  const fixRules = async (ids) => {
+    setBusy(true);
+    try {
+      const data = await api.reglas();
+      const next = data.rules.map((r) => (ids.includes(r.id)
+        ? { ...r, actions: r.actions.map((a) => Object.fromEntries(Object.entries(a).map(([k, v]) => [k, k === 'type' ? v : swapText(v)]))) }
+        : r));
+      const saved = await api.guardarReglas({ settings: data.settings, rules: next });
+      setRules((saved.rules ?? next).filter((x) => x.enabled !== false));
+      setMsg({ type: 'ok', text: `Listo: ${ids.length} regla${ids.length === 1 ? '' : 's'} ahora usa${ids.length === 1 ? '' : 'n'} {target}.` });
+    } catch (e) { setMsg({ type: 'error', text: e.message }); } finally { setBusy(false); }
+  };
+
   if (!status || !draft) return <h1>Modo caos</h1>;
 
   const orphan = draft.ruleIds.filter((id) => !rules.some((r) => r.id === id));
@@ -85,7 +112,7 @@ export default function Caos() {
         <div className="card status">
           <div className="row between"><span className="card-title">Último evento</span></div>
           <div className="card-detail">
-            {status.last ? `${status.last.label} · ${new Date(status.last.at).toLocaleTimeString('es-MX', { hour12: false })}` : '—'}
+            {status.last ? `${status.last.label}${status.last.target ? ` → ${status.last.target}` : ''} · ${new Date(status.last.at).toLocaleTimeString('es-MX', { hour12: false })}` : '—'}
           </div>
         </div>
       </div>
@@ -116,7 +143,28 @@ export default function Caos() {
           </div>
         </div>
 
-        <div className="row between">
+        <h3>A quién le toca</h3>
+        <div className="segmented wide">
+          {Object.entries(CHAOS_TARGETS).map(([id, info]) => (
+            <button key={id} className={(draft.target ?? 'random') === id ? 'active' : ''} onClick={() => setDraft({ ...draft, target: id })}>{info.label}</button>
+          ))}
+        </div>
+        <p className="muted small target-hint">{CHAOS_TARGETS[draft.target ?? 'random'].hint}</p>
+        {(() => {
+          const fixed = rules.filter((r) => draft.ruleIds.includes(r.id) && usesOnlyPlayer(r));
+          if ((draft.target ?? 'random') === 'rule' || fixed.length === 0) return null;
+          return (
+            <div className="banner warn target-warn">
+              <span>
+                {fixed.length === 1 ? 'Esta regla usa' : `Estas ${fixed.length} reglas usan`} <code>{'{player}'}</code> en sus comandos, así que siempre te llega{fixed.length === 1 ? '' : 'n'} a ti:{' '}
+                <strong>{fixed.map((r) => describeTrigger(r.trigger)).join(', ')}</strong>. Para que el caos pueda mandárselas a otros deben usar <code>{'{target}'}</code>.
+              </span>
+              <button className="btn small" disabled={busy} onClick={() => fixRules(fixed.map((r) => r.id))}>Cambiar {'{player}'} por {'{target}'}</button>
+            </div>
+          );
+        })()}
+
+        <div className="row between mt">
           <h3>Reglas que pueden salir ({draft.ruleIds.length - orphan.length})</h3>
           <div className="row gap">
             <button className="btn small ghost" onClick={() => setDraft({ ...draft, ruleIds: rules.map((r) => r.id) })}>Todas</button>
@@ -129,6 +177,7 @@ export default function Caos() {
               <input type="checkbox" checked={draft.ruleIds.includes(r.id)} onChange={() => toggleRule(r.id)} />
               <span className={`badge b-${r.trigger?.type}`}>{TRIGGERS[r.trigger?.type]?.label}</span>
               <span className="rule-name">{describeTrigger(r.trigger)}</span>
+              {(draft.target ?? 'random') !== 'rule' && usesOnlyPlayer(r) && <span className="target-tag warn-tag" title="Usa {player}: siempre te llega a ti">solo a ti</span>}
             </label>
           ))}
           {rules.length === 0 && <div className="empty">No hay reglas activas.</div>}

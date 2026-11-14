@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import RuleEditor from '../components/RuleEditor.jsx';
-import { TRIGGERS, describeTrigger, newRule, simulatedEventFor } from '../rules.js';
+import JugadoresChat from '../components/JugadoresChat.jsx';
+import { TARGETS, TRIGGERS, describeTrigger, newRule, simulatedEventFor } from '../rules.js';
 
 export default function Reglas() {
   const [saved, setSaved] = useState(null);   // lo que hay en disco
@@ -103,6 +104,7 @@ export default function Reglas() {
               <div className="rule-item-main">
                 <span className={`badge b-${r.trigger?.type}`}>{TRIGGERS[r.trigger?.type]?.label ?? '?'}</span>
                 <span className="rule-name">{describeTrigger(r.trigger)}</span>
+                {r.target && r.target !== 'me' && <span className="target-tag" title={`Objetivo: ${TARGETS[r.target]?.label}`}>🎯</span>}
               </div>
               <label className="switch" onClick={(e) => e.stopPropagation()} title={r.enabled === false ? 'Desactivada' : 'Activa'}>
                 <input type="checkbox" checked={r.enabled !== false} onChange={() => toggle(i)} />
@@ -150,8 +152,11 @@ export default function Reglas() {
             <input type="number" min="0" value={(draft.settings.helpCooldownMs ?? 30000) / 1000}
               onChange={(e) => setSetting('helpCooldownMs', Math.max(0, Number(e.target.value)) * 1000)} />
           </label>
-        </div>
+                </div>
       </div>
+
+      <h2>Jugadores y el chat</h2>
+      <JugadoresChat />
     </>
   );
 }

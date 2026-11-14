@@ -272,12 +272,118 @@ MC_SERVER_DIR=C:\Users\vitro\dev\mc-server
 Con eso, en la página **Servidor** del panel puedes:
 - iniciarlo, detenerlo y reiniciarlo;
 - ver la consola en vivo y escribir comandos (con ↑ y ↓ recorres los anteriores).
+- ver la **IP para compartir** con quien esté en tu misma red (botón Copiar);
+- ver los **jugadores conectados** y expulsar a alguien;
+- administrar la **lista blanca**: activarla o desactivarla, agregar y quitar jugadores.
+
+Para que alguien de tu red entre, la red de Windows debe estar como **Privada** y el puerto 25565 permitido en el Firewall. Para gente de fuera de tu casa usa un túnel como Playit.gg (tipo **Minecraft Java**, IP local `127.0.0.1`, puerto 25565, Proxy Protocol en *None*). Pega la dirección del túnel en la tarjeta **Conectarse al servidor** para copiarla con un clic; se guarda en `config/servidor.json`.
+
+Para que Playit se abra solo con la app, agrega `PLAYIT_AUTOSTART=true` a tu `.env` (la busca en `C:\Program Files\playit_gg\bin`; si la instalaste en otro lado, pon esa carpeta en `PLAYIT_PATH`). Abre el icono de la bandeja de Playit, que no tapa el juego. Si Playit ya está corriendo no lo vuelve a abrir, y al cerrar la app Playit sigue corriendo. Nunca abras a internet los puertos 25575 (RCON), 3000 ni 3001.
 
 Si se cae, se reinicia solo en 10 segundos. Para evitar un ciclo de reinicios, se detiene después de 3 caídas en 5 minutos.
 
 Con `MC_SERVER_AUTOSTART=true`, el servidor arranca junto con la app.
 
 > Si el servidor ya está corriendo con `start.bat`, la app lo detecta como "fuera de la app": puede mandarle comandos por RCON, pero no ver su consola. Para controlarlo desde el panel, ciérralo con `stop` y arráncalo desde la app.
+
+## Instalaciones (varios mundos: Vanilla, con mods…)
+
+En la página **Instalaciones** registras varias carpetas de servidor; cada una tiene su propio mundo, lista blanca, mods o plugins. Solo una corre a la vez, siempre en el puerto 25565 (la dirección de Playit y tu IP local no cambian). La activa se elige ahí o en la parte de arriba de la página **Servidor**.
+
+- La carpeta de `MC_SERVER_DIR` aparece sola como primera instalación. Renómbrala si quieres.
+- Detecta Paper, Purpur, Vanilla, Fabric, Quilt, NeoForge y Forge. NeoForge y Forge se arrancan igual que su `run.bat`.
+- Cada instalación puede usar su propio Java (detecta los que tengas en Archivos de programa) y su propia RAM. Si no eliges nada, usa lo del `.env`.
+- Al iniciar, la app ajusta en `server.properties` el puerto (25565) y RCON (`enable-rcon`, `rcon.port`, `rcon.password` del `.env`) para controlarla igual que las demás.
+- **Quitar** una instalación solo la saca del panel; no borra archivos.
+- Se guardan en `config/instalaciones.json`.
+
+Para una con mods: crea una carpeta, pon ahí el *server launcher* de Fabric o instala el servidor de NeoForge/Forge con su instalador (*Install server*), copia los mods a `mods/` y agrégala. Tus amigos necesitan la misma versión y los mismos mods.
+
+## Reglas del mundo (gamerules) y chat limpio
+
+En la página **Servidor**, tarjeta **Reglas del mundo** (con el servidor encendido): interruptores para conservar inventario, ciclo de día y noche, clima, mobs, PvP, mensajes de muerte, porcentaje para dormir, etc. Usa los nombres nuevos (`keep_inventory`, `advance_time`…) desde Minecraft 1.21.11 y los viejos (`keepInventory`…) en versiones anteriores, según la instalación. En Paper se aplican al mundo normal, al Nether y al End.
+
+**Desde el chat (acción "Regla del mundo"):** en cualquier regla (recompensa, comando, bits, donación, votación o caos) agrega la acción *Regla del mundo*: elige la regla, cómo dejarla y por cuántos segundos. Al terminar vuelve sola a como estaba y avisa en Minecraft (puedes escribir tu propio mensaje). Si se vuelve a activar antes de terminar, el tiempo se suma. Con 0 segundos el cambio es permanente.
+
+Ejemplo: 500 bits → *Regenerar vida con la comida* desactivada durante 300 s.
+
+Los cambios pendientes se guardan en `config/gamerules-temporales.json`: si cierras la app o apagas el servidor, se regresan en cuanto vuelva a haber conexión (y solo en la instalación donde se hicieron). En la tarjeta *Reglas del mundo* se ve la cuenta regresiva y el botón *Terminar ya*.
+
+**Mensajes "[Rcon: …]" en el chat:** apaga *Avisar en el chat los comandos de administradores* (`log_admin_commands`), que hace efecto al instante. Además, al iniciar cualquier instalación la app pone `broadcast-rcon-to-ops=false` y `broadcast-console-to-ops=false` en `server.properties`.
+
+## Respaldos del mundo
+
+En la página **Servidor**, tarjeta **Respaldos** (siempre de la instalación activa):
+
+- **Automáticos** cada 2 horas mientras el servidor está encendido y **al detenerlo** (no al reiniciar ni si se cae). Se conservan los últimos 10; los manuales y los "Antes de restaurar" no se borran solos.
+- **Respaldar ahora** en cualquier momento. Con el servidor encendido no hay riesgo: la app pausa el guardado (`save-off`), guarda todo (`save-all flush`), copia y lo reactiva (`save-on`). Nadie tiene que salir.
+- **Restaurar** (con el servidor apagado): antes guarda una copia del mundo actual. Solo reemplaza las carpetas del mundo; la lista blanca y la configuración se quedan como están.
+- Se guardan como `.zip` en `mc-backups\<instalación>` junto a la carpeta del servidor (por ejemplo `C:\Users\vitro\dev\mc-backups\principal`). En los ajustes puedes cambiar la carpeta, por ejemplo a otro disco.
+- Usa el `tar.exe` que trae Windows 10/11; no hay que instalar nada. Ajustes en `config/respaldos.json`.
+
+## Jugar con más gente: a quién le llega cada regla
+
+Cada regla tiene **A quién le llega** (página Reglas):
+
+| Objetivo | Qué hace |
+|---|---|
+| **Tú** | Como siempre: a `MC_PLAYER`. |
+| **Lo elige el chat** | Recompensa con "Pedir texto al espectador" (escribe el nombre), `!comando Nombre`, o un nombre en el mensaje de bits/donación. |
+| **Al azar** | Alguien conectado al azar (te incluye). |
+| **Todos** | Todos los conectados. |
+
+En los comandos usa `{target}` donde va el jugador (por ejemplo `give {target} minecraft:diamond 1`); `{player}` sigue siendo siempre tú. En textos (chat, mensajes, títulos), `{target}` es el nombre o "todos". El botón **Cambiar {player} por {target}** lo hace por ti.
+
+- Solo se acepta un jugador **conectado**. Si no está o está protegido, en recompensas y comandos no se ejecuta, se avisa en el chat y se devuelven los puntos. En bits y donaciones nunca se pierde: te toca a ti.
+- **Apodos** (Reglas → Jugadores y el chat): "many" → `ManyGamer123`. Mayúsculas y minúsculas dan igual.
+- **Protegidos**: no reciben nada del chat (ni elegidos, ni al azar, ni en "todos"). Tú no te puedes proteger.
+- Se guardan en `config/jugadores.json`.
+
+**Modo caos con varios jugadores** (página Modo caos → *A quién le toca*):
+- **Al azar** (predeterminado): cada evento le toca a alguien conectado al azar, tú incluido; nunca a los protegidos.
+- **Lo que diga cada regla**: usa el objetivo de cada regla.
+- **Todos**: a todos los conectados.
+
+Las reglas cuyos comandos usan `{player}` siempre te llegan a ti; la página las marca como "solo a ti" y tiene un botón para cambiarlas a `{target}`.
+
+## Estadísticas
+
+La página **Estadísticas** muestra lo que hizo tu chat: interacciones, espectadores distintos, bits, donaciones (por moneda), lo que no se ejecutó (cooldown, rechazadas, fallidas), actividad en el tiempo, espectadores más activos, lo que más pidieron, a quién le tocó y un registro con buscador.
+
+- Periodos: **Este directo**, Hoy, 7 días, 30 días, Todo, o un **directo anterior** de la lista (se separan solos cuando pasan más de 2 horas sin actividad).
+- Las pruebas (botón Probar) no cuentan, salvo que marques *Incluir pruebas*.
+- **Exportar CSV** descarga el periodo para abrirlo en Excel.
+- Se guarda en `data/historial/AAAA-MM.jsonl` (un archivo por mes, una línea por interacción).
+
+## Instalador de Windows
+
+```powershell
+npm install        # la primera vez (agrega electron-builder)
+npm run dist       # compila el panel y crea el instalador
+```
+
+El instalador queda en `dist-instalador\stream-interact-instalador-<versión>.exe`. Al abrirlo, Windows puede mostrar "Windows protegió tu PC" porque la app no está firmada: **Más información → Ejecutar de todas formas**.
+
+- Se instala para tu usuario, con acceso directo en el escritorio y en el menú Inicio.
+- **La primera vez pregunta dónde están tus datos** (`.env`, `config/`, `data/`, `media/`). Elige tu carpeta del proyecto (por ejemplo `C:\Users\vitro\dev\stream-interact`) para usar la misma configuración, reglas, historial y sesión de Twitch que en desarrollo. O crea una nueva en Documentos.
+- En la bandeja: **Iniciar con Windows** (arranca directo en la bandeja), **Abrir carpeta de datos** y **Cambiar carpeta de datos…**
+- Para actualizar: `npm run dist` otra vez y ejecuta el nuevo instalador encima; tus datos no se tocan. Desinstalar tampoco los borra.
+- Si usas la versión instalada y `npm run desktop` con la misma carpeta de datos, no abras las dos a la vez (usan el mismo puerto).
+
+## Actualizaciones automáticas
+
+La versión instalada revisa al abrirse (y cada 4 horas) si hay una versión nueva en las [Releases del repositorio](https://github.com/SopaHeladaGames/stream-interact/releases), la descarga sola y te avisa (notificación, bandeja y abajo del menú del panel). Nunca reinicia sola: le das **Reiniciar y actualizar** cuando quieras, o se instala al salir de la app. Tus datos no se tocan.
+
+**Publicar una versión** (desde la carpeta del proyecto, con tus cambios listos):
+
+```powershell
+npm run publicar                         # arreglos: 0.2.0 → 0.2.1
+npm run publicar -- minor "Estadísticas"   # funciones nuevas: 0.2.1 → 0.3.0
+```
+
+Eso sube el número de versión, hace commit, crea el tag y hace push. GitHub Actions (`.github/workflows/release.yml`) compila el instalador en Windows y lo publica en Releases en unos 5 minutos; puedes seguirlo en la pestaña **Actions** del repositorio.
+
+No se suben `.env`, `data/`, `media/` ni tu configuración personal de `config/` (solo `config/rules.json`, que el instalador usa como reglas de ejemplo).
 
 ## 6. Botón de pánico
 

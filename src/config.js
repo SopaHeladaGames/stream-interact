@@ -40,5 +40,10 @@ export const config = {
     autoRestart: (process.env.MC_AUTO_RESTART ?? 'true') === 'true',
     autoStart: (process.env.MC_SERVER_AUTOSTART ?? 'false') === 'true'
   },
+  // Abrir el cliente de Playit.gg junto con la app (opcional)
+  playit: {
+    enabled: (process.env.PLAYIT_AUTOSTART ?? 'false') === 'true',
+    customPath: process.env.PLAYIT_PATH || null
+  },
   chatReplies: (process.env.CHAT_REPLIES ?? 'true') === 'true'
 };

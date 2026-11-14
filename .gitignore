@@ -3,3 +3,8 @@ node_modules/
 data/
 *.log
 panel/dist/
+dist-instalador/
+media/
+# Tu configuración personal no se sube (rutas, jugadores, ajustes); las reglas sí, como ejemplo para el instalador
+config/*
+!config/rules.json

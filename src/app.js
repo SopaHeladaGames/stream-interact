@@ -10,13 +10,20 @@ import { overlayFeed } from './core/overlayFeed.js';
 import { createTwitchAuth } from './auth/twitchAuth.js';
 import { startTwitch } from './adapters/twitch.js';
 import { MinecraftServer } from './minecraftServer.js';
+import { startPlayit } from './playit.js';
+import { InstallationStore } from './installations.js';
+import { BackupManager } from './backups.js';
+import { GameruleManager } from './gamerules.js';
+import { HistoryStore } from './core/history.js';
+import { PlayerTargets } from './core/targets.js';
+import { parseList } from './minecraftPlayers.js';
 import { GameStore } from './game/gameStore.js';
 import { PollManager } from './game/polls.js';
 import { ChaosMode } from './game/chaos.js';
 import { DonationManager } from './donations/index.js';
 import { chatFeed } from './core/chatFeed.js';
 import { formatMoney } from './core/money.js';
-import { createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, registerOverlayRoutes, registerDonationRoutes, servePanel } from './server.js';
+import { createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, registerOverlayRoutes, registerDonationRoutes, registerStatsRoutes, servePanel } from './server.js';
 
 /**
  * Arranca todo el backend: reglas, RCON, servidor HTTP + panel y Twitch.
@@ -25,7 +32,7 @@ import { createServer, registerApiRoutes, registerServerRoutes, registerGameRout
  * Devuelve en cuanto el servidor HTTP escucha; Twitch se conecta en segundo plano
  * (la primera vez espera a que inicies sesión).
  */
-export async function startApp() {
+export async function startApp(options = {}) {
   // Se importa aquí para que un .env incompleto se reporte como error de arranque (y Electron pueda mostrarlo)
   const { config } = await import('./config.js');
 
@@ -33,10 +40,32 @@ export async function startApp() {
   const app = createServer();
   const bus = new EventBus({ gapMs: 500 });
   const mc = new MinecraftRcon(config.minecraft);
-  const mcServer = new MinecraftServer({ ...config.mcServer, onRconReady: () => mc.tryConnect() });
+  const mcServer = new MinecraftServer({
+    ...config.mcServer,
+    rcon: { port: config.minecraft.port, password: config.minecraft.password },
+    onRconReady: () => mc.tryConnect()
+  });
+  // Instalaciones (Vanilla, con mods…): la activa es la que arranca ▶ Iniciar
+  const installations = new InstallationStore(path.resolve('config', 'instalaciones.json'), {
+    seedDir: config.mcServer.dir,
+    defaults: { java: config.mcServer.java, memoryMin: config.mcServer.memoryMin, memoryMax: config.mcServer.memoryMax, extraArgs: config.mcServer.extraArgs ?? '' }
+  });
+  if (installations.active) mcServer.setInstallation(installations.effective(installations.active));
+  // Respaldos del mundo de la instalación activa
+  const backups = new BackupManager({
+    file: path.resolve('config', 'respaldos.json'), mcServer, mc,
+    getInstallation: () => installations.active
+  });
 
   const chatSenders = {};
+  // Reglas del mundo (/gamerule): panel y acción "gamerule" de las reglas (con duración opcional)
+  const gamerules = new GameruleManager({
+    mc, file: path.resolve('config', 'gamerules-temporales.json'),
+    getInstallationId: () => installations.active?.id ?? null
+  });
+
   const actions = {
+    gamerule: (action, vars) => gamerules.applyAction(action, vars),
     minecraft: minecraftAction(mc),
     announce: announceAction(mc),
     title: titleAction(mc),
@@ -44,8 +73,21 @@ export async function startApp() {
     overlay: overlayAction(),
     wait: async (action) => new Promise((r) => setTimeout(r, action.ms ?? 1000))
   };
-  const engine = new RulesEngine({ rulesPath, bus, context: { player: config.minecraft.player }, actions });
+  // A quién le llega cada regla: tú, quien elija el chat, alguien al azar o todos
+  const targets = new PlayerTargets({
+    file: path.resolve('config', 'jugadores.json'),
+    me: config.minecraft.player,
+    online: async () => {
+      if (!mc.connected) await mc.tryConnect({ quiet: true });
+      if (!mc.connected) throw new Error('Sin RCON');
+      return parseList(await mc.send('minecraft:list')).players;
+    }
+  });
+  const engine = new RulesEngine({ rulesPath, bus, context: { player: config.minecraft.player }, actions, targets });
   const store = new RulesStore(rulesPath, Object.keys(actions));
+  // Historial de lo que hizo el chat (estadísticas): data/historial/AAAA-MM.jsonl
+  const history = new HistoryStore(path.resolve('data', 'historial'));
+  engine.onRecord((rec) => history.record(rec));
 
   // Votaciones y modo caos: avisan en el chat de Twitch y dentro de Minecraft
   const notify = {
@@ -114,7 +156,14 @@ export async function startApp() {
   registerGameRoutes(app, { polls, chaos, gameStore });
   registerOverlayRoutes(app, { gameStore });
   registerDonationRoutes(app, { donations });
-  registerServerRoutes(app, { mcServer, mc });
+  registerStatsRoutes(app, { history });
+  // Versión y actualizaciones (las maneja la app de escritorio; sin ella solo se informa la versión)
+  app.get('/api/app/version', (_req, res) => res.json(options.updates?.status() ?? { current: process.env.npm_package_version ?? null, packaged: false, state: 'dev' }));
+  app.post('/api/app/buscar-actualizacion', async (_req, res) => res.json(options.updates ? await options.updates.check() : { state: 'dev' }));
+  app.post('/api/app/actualizar', (_req, res) => {
+    try { res.json(options.updates?.install() ?? { ok: false }); } catch (err) { res.status(err.status ?? 500).json({ error: err.message }); }
+  });
+  registerServerRoutes(app, { mcServer, mc, installations, backups, targets, gamerules, pickFolder: options.pickFolder, openPath: options.openPath });
 
   // Las rutas /auth/* se registran antes del panel para que este no las tape
   const authPromise = createTwitchAuth(app, config.twitch, config.port);
@@ -135,6 +184,8 @@ export async function startApp() {
     if (!mc.connected) await mc.tryConnect({ quiet: true });
     mcServer.markExternal(mc.connected);
   }, 10000);
+
+  startPlayit(config.playit).catch((err) => log.error(`Playit: ${err.message}`));
 
   if (config.mcServer.autoStart && mcServer.configured && !mc.connected) {
     try { mcServer.start(); } catch (err) { log.error(err.message); }
@@ -169,6 +220,9 @@ export async function startApp() {
     polls.dispose();
     twitch?.stop();
     if (mcServer.proc) await mcServer.stop();
+    await backups.whenIdle(); // que el respaldo al detener termine antes de salir
+    backups.dispose();
+    gamerules.dispose();
     mc.close();
     const closed = new Promise((r) => server.close(() => r()));
     server.closeAllConnections?.(); // el feed en vivo mantiene conexiones abiertas
