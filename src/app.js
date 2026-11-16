@@ -13,6 +13,7 @@ import { MinecraftServer } from './minecraftServer.js';
 import { startPlayit } from './playit.js';
 import { InstallationStore } from './installations.js';
 import { BackupManager } from './backups.js';
+import { PaperUpdater } from './paperUpdater.js';
 import { GameruleManager } from './gamerules.js';
 import { HistoryStore } from './core/history.js';
 import { RedemptionQueue } from './core/redemptions.js';
@@ -195,7 +196,8 @@ export async function startApp(options = {}) {
   app.post('/api/app/actualizar', (_req, res) => {
     try { res.json(options.updates?.install() ?? { ok: false }); } catch (err) { res.status(err.status ?? 500).json({ error: err.message }); }
   });
-  registerServerRoutes(app, { mcServer, mc, installations, backups, targets, gamerules, pickFolder: options.pickFolder, openPath: options.openPath });
+  const paper = new PaperUpdater({ installations, mcServer });
+  registerServerRoutes(app, { mcServer, mc, installations, backups, paper, targets, gamerules, pickFolder: options.pickFolder, openPath: options.openPath });
 
   // Las rutas /auth/* se registran antes del panel para que este no las tape
   const authPromise = createTwitchAuth(app, config.twitch, config.port);

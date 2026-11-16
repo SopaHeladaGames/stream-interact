@@ -122,12 +122,134 @@ function InstallCard({ item, active, running, busy, defaults, onActivate, onStar
         <span title={item.java || defaults.java}>☕ {item.java ? shortJava(item.java) : 'Java del .env'}</span>
       </div>
       {problems.map((p) => <div key={p} className="install-problem">⚠ {p}</div>)}
+      {info.type === 'paper' && info.exists && <PaperUpdate id={item.id} restartsServer={active && running} />}
       <div className="row gap wrap install-actions">
         {!active && <button className="btn small" onClick={onActivate} disabled={busy || running}>Usar esta</button>}
         <button className="btn small primary" onClick={onStart} disabled={busy || running || !ok}>{active ? '▶ Iniciar' : '▶ Usar e iniciar'}</button>
         <button className="btn small ghost" onClick={onEdit}>Editar</button>
         {!active && <button className="btn small ghost danger" onClick={onRemove}>Quitar</button>}
       </div>
+    </div>
+  );
+}
+
+const PHASES = {
+  buscando: 'Buscando el build más nuevo…',
+  descargando: 'Descargando',
+  verificando: 'Verificando el archivo…',
+  deteniendo: 'Deteniendo el servidor…',
+  reemplazando: 'Cambiando el .jar…',
+  iniciando: 'Iniciando el servidor…'
+};
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '');
+const mb = (n) => `${(n / 1048576).toFixed(1)} MB`;
+
+/** Revisa si hay un build más nuevo de Paper y lo instala con un clic. */
+function PaperUpdate({ id, restartsServer }) {
+  const [info, setInfo] = useState(null);
+  const [error, setError] = useState(null);
+  const [job, setJob] = useState(null);
+  const [note, setNote] = useState(null);
+  const [checking, setChecking] = useState(false);
+
+  const check = async (force = false) => {
+    setChecking(true);
+    try {
+      const r = await api.paperInfo(id, force);
+      setInfo(r); setError(null);
+      if (r.job && !r.job.done) setJob(r.job);
+    } catch (e) { setError(e.message); } finally { setChecking(false); }
+  };
+  useEffect(() => { check(); }, [id]);
+
+  // Mientras actualiza, preguntar el avance
+  const working = job && !job.done;
+  useEffect(() => {
+    if (!working) return;
+    const t = setInterval(async () => {
+      try {
+        const { job: j } = await api.paperEstado(id);
+        if (!j) return;
+        setJob(j);
+        if (j.done) {
+          if (j.phase === 'listo') setNote({ type: 'ok', text: `✓ Paper actualizado al build ${j.to}${j.restarted ? '. El servidor se está iniciando de nuevo.' : '. Se usará la próxima vez que inicies el servidor.'}` });
+          else if (j.phase === 'al-dia') setNote({ type: 'ok', text: '✓ Ya estaba al día.' });
+          else setNote({ type: 'error', text: j.error });
+          check(true);
+        }
+      } catch { /* reintenta en el siguiente ciclo */ }
+    }, 700);
+    return () => clearInterval(t);
+  }, [working, id]);
+
+  const update = async () => {
+    const msg = restartsServer
+      ? `¿Actualizar Paper al build ${info.latest.build}?\n\nEl servidor está encendido: primero se descarga el nuevo .jar y luego se reinicia (los jugadores se desconectan unos segundos y pueden volver a entrar).`
+      : `¿Actualizar Paper al build ${info.latest.build}?`;
+    if (!confirm(msg)) return;
+    setNote(null);
+    try { setJob((await api.actualizarPaper(id)).job); } catch (e) { setNote({ type: 'error', text: e.message }); }
+  };
+
+  const revert = async () => {
+    if (!confirm('¿Regresar al .jar de Paper que tenías antes de la última actualización?')) return;
+    try { setInfo(await api.revertirPaper(id)); setNote({ type: 'ok', text: '↩ Regresaste a la versión anterior de Paper.' }); } catch (e) { setNote({ type: 'error', text: e.message }); }
+  };
+
+  const pct = job?.total ? Math.min(100, Math.round((job.received / job.total) * 100)) : null;
+
+  return (
+    <div className="paper-update">
+      {!info && !error && <div className="muted small">Buscando actualizaciones de Paper…</div>}
+      {error && !info && (
+        <div className="row between gap">
+          <span className="muted small">No pude revisar actualizaciones de Paper: {error}</span>
+          <button className="btn small ghost" onClick={() => check(true)} disabled={checking}>Reintentar</button>
+        </div>
+      )}
+      {info && (
+        <>
+          <div className="row between gap wrap">
+            <div className="paper-line">
+              <strong>Paper {info.mc}</strong>
+              <span className="muted"> · build {info.current?.build ?? '?'}{info.current?.time ? ` (${fmtDate(info.current.time)})` : ''}</span>
+              {info.upToDate
+                ? <span className="pill ok">✓ Al día</span>
+                : <span className="pill warn">Build {info.latest.build} disponible{info.behind ? ` · ${info.behind} atrás` : ''}</span>}
+              {info.latest.channel && info.latest.channel !== 'STABLE' && <span className="pill off" title="PaperMC aún no marca como estable ningún build de esta versión">{info.latest.channel.toLowerCase()}</span>}
+            </div>
+            <div className="row gap">
+              {!info.upToDate && <button className="btn small primary" onClick={update} disabled={working}>⬆ Actualizar Paper</button>}
+              <button className="btn small ghost" onClick={() => check(true)} disabled={checking || working} title="Volver a buscar">↻</button>
+            </div>
+          </div>
+
+          {working && (
+            <div className="paper-job">
+              <div className="small">{PHASES[job.phase] ?? job.phase}{job.phase === 'descargando' && job.total ? ` ${mb(job.received)} de ${mb(job.total)}` : ''}</div>
+              <div className="paper-progress"><span style={{ width: `${job.phase === 'descargando' ? (pct ?? 5) : 100}%` }} /></div>
+            </div>
+          )}
+          {note && <div className={`small paper-note ${note.type}`}>{note.text}</div>}
+
+          {!info.upToDate && info.changes.length > 0 && (
+            <details className="paper-changes">
+              <summary className="small">Qué cambió</summary>
+              <ul>{info.changes.map((c, i) => <li key={i}><span className="muted">#{c.build}</span> {c.message}</li>)}</ul>
+            </details>
+          )}
+          {info.current && !info.current.exact && <div className="muted small">El build instalado lo tomé de lo que Paper anotó al arrancar.</div>}
+          {info.newerMc && (
+            <div className="muted small">
+              Ya existe Paper para Minecraft {info.newerMc}. Ese salto no se hace desde aquí: convierte el mundo (no se puede deshacer)
+              y tus amigos tendrían que actualizar su juego.
+            </div>
+          )}
+          {info.hasPrevious && !working && (
+            <button className="link-btn small" onClick={revert} disabled={restartsServer} title={restartsServer ? 'Detén el servidor primero' : ''}>↩ Regresar a la versión anterior</button>
+          )}
+        </>
+      )}
     </div>
   );
 }

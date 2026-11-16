@@ -348,7 +348,7 @@ export function registerStatsRoutes(app, { history }) {
   }));
 }
 
-export function registerServerRoutes(app, { mcServer, mc, installations, backups, targets, gamerules, pickFolder, openPath }) {
+export function registerServerRoutes(app, { mcServer, mc, installations, backups, paper, targets, gamerules, pickFolder, openPath }) {
   // ---------- Jugadores que el chat puede elegir (apodos y protegidos) ----------
   app.get('/api/jugadores-chat', route(() => targets.get()));
   app.put('/api/jugadores-chat', route((req) => targets.update(req.body ?? {})));
@@ -408,6 +408,11 @@ export function registerServerRoutes(app, { mcServer, mc, installations, backups
     return item;
   }));
   app.delete('/api/instalaciones/:id', route((req) => { installations.remove(req.params.id); return { ok: true }; }));
+  // Actualizar Paper (mismo Minecraft, build más nuevo)
+  app.get('/api/instalaciones/:id/paper', route((req) => paper.check(req.params.id, { force: req.query.forzar === '1' })));
+  app.get('/api/instalaciones/:id/paper/estado', route((req) => ({ job: paper.status(req.params.id) })));
+  app.post('/api/instalaciones/:id/paper/actualizar', route((req) => ({ job: paper.update(req.params.id) })));
+  app.post('/api/instalaciones/:id/paper/revertir', route((req) => paper.revert(req.params.id)));
   app.post('/api/instalaciones/:id/activar', route(async (req) => {
     activate(req.params.id);
     if (req.body?.start) mcServer.start();

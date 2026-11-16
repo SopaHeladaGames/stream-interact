@@ -568,3 +568,14 @@ select.invalid { border-color: var(--error); color: var(--error); }
   .rules-layout { grid-template-columns: 1fr; }
   .rule-list { position: static; max-height: none; }
 }
+
+/* Actualizar Paper (tarjeta de instalación) */
+.paper-update { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); }
+.paper-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.paper-job { display: flex; flex-direction: column; gap: 4px; }
+.paper-progress { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.paper-progress span { display: block; height: 100%; background: var(--accent); transition: width .5s ease; }
+.paper-note.ok { color: var(--ok); }
+.paper-note.error { color: var(--danger, #ff5d6c); }
+.paper-changes ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; max-height: 160px; overflow: auto; }
+.paper-changes summary { cursor: pointer; color: var(--muted); }
