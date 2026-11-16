@@ -32,7 +32,8 @@ export default function Probar() {
   return (
     <>
       <h1>Probar</h1>
-      <p className="muted">Simula eventos sin estar en directo. Revisa el resultado en Inicio → Actividad en vivo, o dentro del juego.</p>
+      <p className="muted">Simula eventos sin estar en directo. Revisa el resultado en Inicio → Actividad en vivo, o dentro del juego.
+        Las pruebas no respetan ni activan los tiempos de espera, no cuentan para el límite por directo y sus mensajes no se mandan a tu chat de Twitch.</p>
       {flash && <div className={`banner ${flash.type}`}>{flash.text}</div>}
 
       <div className="card">

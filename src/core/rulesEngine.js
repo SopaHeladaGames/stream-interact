@@ -87,13 +87,15 @@ export class RulesEngine {
       }
     }
 
-    const cooldownLeft = (rule.cooldownMs ?? 0) - (now - (this.lastRun.get(ruleKey) ?? 0));
-    const userCooldownLeft = (rule.userCooldownMs ?? 0) - (now - (this.lastRunByUser.get(userKey) ?? 0));
+    // Las pruebas (página Probar) no esperan ni dejan tiempo de espera: así no le quitan nada al chat real
+    const isTest = event.platform === 'simulado';
+    const cooldownLeft = isTest ? 0 : (rule.cooldownMs ?? 0) - (now - (this.lastRun.get(ruleKey) ?? 0));
+    const userCooldownLeft = isTest ? 0 : (rule.userCooldownMs ?? 0) - (now - (this.lastRunByUser.get(userKey) ?? 0));
 
     // Bits y donaciones son dinero real: nunca se descartan. Si la regla está en cooldown, se pospone.
     if (paid) {
       const waitMs = Math.max(0, cooldownLeft);
-      this.lastRun.set(ruleKey, now + waitMs); // el siguiente espera a que pase este
+      if (!isTest) this.lastRun.set(ruleKey, now + waitMs); // el siguiente espera a que pase este
       if (waitMs === 0) { this.enqueueRule(rule, event, ruleKey); return; }
       const secs = Math.ceil(waitMs / 1000);
       log.info(`"${ruleKey}" de ${event.user.displayName} en espera ${secs}s por cooldown`);
@@ -128,7 +130,7 @@ export class RulesEngine {
 
     const accepted = this.enqueueRule(rule, event, ruleKey, target);
 
-    if (accepted) {
+    if (accepted && !isTest) {
       this.lastRun.set(ruleKey, now);
       this.lastRunByUser.set(userKey, now);
     } else {
