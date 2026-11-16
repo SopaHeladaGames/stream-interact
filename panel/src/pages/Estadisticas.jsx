@@ -10,7 +10,8 @@ const STATUS = {
   cooldown: { label: 'Cooldown', cls: 'off' },
   rechazada: { label: 'Rechazada', cls: 'off' },
   pausa: { label: 'En pausa', cls: 'off' },
-  'sin-regla': { label: 'Sin regla', cls: 'off' }
+  'sin-regla': { label: 'Sin regla', cls: 'off' },
+  limite: { label: 'Límite del directo', cls: 'off' }
 };
 
 const num = (n) => Number(n ?? 0).toLocaleString('es-MX');

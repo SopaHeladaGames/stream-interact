@@ -57,6 +57,7 @@ export class RulesStore {
       else if (t.type === 'command' && !t.name.startsWith('!')) errors.push(`${label}: los comandos deben empezar con "!"`);
 
       if (rule.target != null && !TARGETS.includes(rule.target)) errors.push(`${label}: objetivo "${rule.target}" inválido`);
+      if (rule.maxPerStream != null && !(Number.isInteger(rule.maxPerStream) && rule.maxPerStream >= 1)) errors.push(`${label}: el máximo por directo debe ser un número entero ≥ 1`);
 
       for (const key of ['cooldownMs', 'userCooldownMs']) {
         if (rule[key] != null && (!Number.isFinite(rule[key]) || rule[key] < 0)) errors.push(`${label}: ${key} debe ser un número ≥ 0`);
@@ -67,6 +68,8 @@ export class RulesStore {
       } else {
         rule.actions.forEach((a, j) => {
           if (!this.actionTypes.includes(a?.type)) errors.push(`${label}, acción ${j + 1}: tipo "${a?.type}" desconocido`);
+          if (a?.type === 'minecraft' && a.repeat != null && !(Number(a.repeat) >= 1 && Number(a.repeat) <= 100)) errors.push(`${label}, acción ${j + 1}: repetir va de 1 a 100`);
+          if (a?.type === 'caos' && !(Number(a.seconds) >= 10 && Number(a.seconds) <= 7200)) errors.push(`${label}, acción ${j + 1}: el modo caos dura de 10 a 7200 segundos`);
           if (a?.type === 'gamerule') {
             const gr = GAMERULES.find((r) => r.id === a.rule);
             if (!gr) errors.push(`${label}, acción ${j + 1}: elige una regla del mundo`);

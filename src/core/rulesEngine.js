@@ -21,6 +21,7 @@ export class RulesEngine {
     this.lastHelp = 0;
     this.runListeners = new Set();
     this.recordListeners = new Set(); // historial / estadísticas
+    this.countThisStream = null;      // (ruleId) => cuántas veces se usó en este directo (lo da el historial)
     this.load();
     fs.watchFile(rulesPath, { interval: 1000 }, () => this.load());
     bus.onEvent((event) => this.handle(event));
@@ -35,6 +36,7 @@ export class RulesEngine {
         helpCommand: '!comandos',
         helpCooldownMs: 30000,
         pauseRewards: true,
+        bitsPerCurrency: { USD: 100, MXN: 5 },
         ...(data.settings ?? {})
       };
       log.info(`📜 ${this.rules.length} reglas cargadas desde ${this.rulesPath}`);
@@ -60,7 +62,7 @@ export class RulesEngine {
       if (event.name === this.settings.helpCommand) return this.help(event);
     }
 
-    const rule = this.rules.find((r) => matches(r.trigger, event));
+    const rule = this.rules.find((r) => matches(r.trigger, event, this.settings));
     if (!rule) {
       // Bits y donaciones se guardan aunque no tengan regla (para las estadísticas)
       if (event.type === 'cheer' || event.type === 'donation') this.#record(event, null, 'sin-regla');
@@ -70,11 +72,37 @@ export class RulesEngine {
     const now = Date.now();
     const ruleKey = rule.id ?? rule.trigger.name ?? JSON.stringify(rule.trigger);
     const userKey = `${ruleKey}:${event.user.id}`;
+    const paid = event.type === 'cheer' || event.type === 'donation';
+
+    // Límite por directo (ej. "Modo caos" una vez por directo)
+    if (rule.maxPerStream && this.countThisStream) {
+      const used = this.countThisStream(rule.id);
+      if (used >= rule.maxPerStream) {
+        const msg = rule.maxPerStream === 1 ? 'ya se usó en este directo' : `ya se usó ${used} veces en este directo (máximo ${rule.maxPerStream})`;
+        log.warn(`"${ruleKey}" ${msg}`);
+        const refunded = event.refund ? await event.refund().then(() => true, () => false) : false;
+        this.#record(event, rule, 'limite', { refunded });
+        await this.reply(event, `@${event.user.name} ${this.ruleLabel(rule.id)} ${msg}.${refunded ? ' Te devolví tus puntos.' : ''}`);
+        return;
+      }
+    }
+
     const cooldownLeft = (rule.cooldownMs ?? 0) - (now - (this.lastRun.get(ruleKey) ?? 0));
     const userCooldownLeft = (rule.userCooldownMs ?? 0) - (now - (this.lastRunByUser.get(userKey) ?? 0));
-    // Una donación es dinero real: nunca se descarta por cooldown
-    const waitMs = event.type === 'donation' ? 0 : Math.max(cooldownLeft, userCooldownLeft);
 
+    // Bits y donaciones son dinero real: nunca se descartan. Si la regla está en cooldown, se pospone.
+    if (paid) {
+      const waitMs = Math.max(0, cooldownLeft);
+      this.lastRun.set(ruleKey, now + waitMs); // el siguiente espera a que pase este
+      if (waitMs === 0) { this.enqueueRule(rule, event, ruleKey); return; }
+      const secs = Math.ceil(waitMs / 1000);
+      log.info(`"${ruleKey}" de ${event.user.displayName} en espera ${secs}s por cooldown`);
+      setTimeout(() => this.enqueueRule(rule, event, ruleKey), waitMs);
+      if (this.settings.cooldownReplies) await this.reply(event, `@${event.user.name} ¡gracias! Tu ${this.ruleLabel(rule.id)} llega en ${formatSecs(secs)} (hay otro en curso).`);
+      return;
+    }
+
+    const waitMs = Math.max(cooldownLeft, userCooldownLeft);
     if (waitMs > 0) {
       const secs = Math.ceil(waitMs / 1000);
       log.warn(`"${ruleKey}" en cooldown (${secs}s) para ${event.user.displayName}`);
@@ -188,7 +216,7 @@ export class RulesEngine {
 
   /** La regla que se usaría para este evento (la primera que coincide), o null. */
   findRule(event) {
-    return this.rules.find((r) => matches(r.trigger, event)) ?? null;
+    return this.rules.find((r) => matches(r.trigger, event, this.settings)) ?? null;
   }
 
   /** ¿Existe una regla activa con ese id? */
@@ -241,8 +269,28 @@ export class RulesEngine {
   }
 }
 
-function matches(trigger, event) {
-  if (!trigger || trigger.type !== event.type) return false;
+/**
+ * Bits que "vale" un evento: los cheers son bits; una donación se convierte con la tabla
+ * de equivalencias (settings.bitsPerCurrency, ej. { USD: 100, MXN: 5 }). null = no se puede convertir.
+ */
+export function bitsValue(event, rates = {}) {
+  if (event.type === 'cheer') return event.amount ?? 0;
+  if (event.type !== 'donation') return null;
+  const rate = Number(rates[String(event.currency ?? '').toUpperCase()]);
+  return rate > 0 ? Math.floor((event.amount ?? 0) * rate) : null;
+}
+
+function matches(trigger, event, settings = {}) {
+  if (!trigger) return false;
+  // Regla de bits que también acepta donaciones por su equivalente en bits
+  if (trigger.type === 'cheer' && trigger.includeDonations && event.type === 'donation') {
+    const bits = bitsValue(event, settings.bitsPerCurrency);
+    if (bits === null) return false;
+    if (trigger.minAmount && bits < trigger.minAmount) return false;
+    if (trigger.maxAmount && bits > trigger.maxAmount) return false;
+    return true;
+  }
+  if (trigger.type !== event.type) return false;
   if (trigger.platform && trigger.platform !== event.platform) return false;
   if (trigger.name && trigger.name.toLowerCase() !== event.name.toLowerCase()) return false;
   if (trigger.minAmount && (event.amount ?? 0) < trigger.minAmount) return false;

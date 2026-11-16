@@ -86,24 +86,35 @@ export default function RuleEditor({ rule, onChange }) {
                 <span>Máximo de bits (opcional)</span>
                 <input type="number" min="1" value={t.maxAmount ?? ''} onChange={(e) => setTrigger({ maxAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
               </label>
+              <label className="check field-note">
+                <input type="checkbox" checked={Boolean(t.includeDonations)} onChange={(e) => setTrigger({ includeDonations: e.target.checked || undefined })} />
+                También donaciones por su equivalente en bits (la tabla está en Reglas → Ajustes)
+              </label>
             </>
           )}
         </div>
 
-        {t.type === 'donation' && (
-          <p className="muted small">Las donaciones <strong>no usan cooldown</strong>: cada donación siempre ejecuta su regla.</p>
+        {(t.type === 'donation' || t.type === 'cheer') && (
+          <p className="muted small">Bits y donaciones son dinero: <strong>nunca se pierden</strong>. Si llegan durante el cooldown, se ejecutan cuando termine (se avisa en el chat).</p>
         )}
         <div className="field-row">
-          {t.type !== 'donation' && <>
+          <>
           <label className="field">
             <span>Cooldown general (s)</span>
             <input type="number" min="0" value={toSecs(rule.cooldownMs)} onChange={(e) => set({ cooldownMs: toMs(e.target.value) })} placeholder="0" />
           </label>
+          {t.type !== 'donation' && t.type !== 'cheer' && (
           <label className="field">
             <span>Cooldown por usuario (s)</span>
             <input type="number" min="0" value={toSecs(rule.userCooldownMs)} onChange={(e) => set({ userCooldownMs: toMs(e.target.value) })} placeholder="0" />
           </label>
-          </>}
+          )}
+          </>
+          <label className="field">
+            <span>Máximo por directo</span>
+            <input type="number" min="1" value={rule.maxPerStream ?? ''} placeholder="Sin límite"
+              onChange={(e) => set({ maxPerStream: e.target.value === '' ? undefined : Math.max(1, Math.round(Number(e.target.value))) })} />
+          </label>
           <label className="field">
             <span>ID interno</span>
             <input value={rule.id ?? ''} onChange={(e) => set({ id: e.target.value.replace(/\s/g, '-') })} />
@@ -155,17 +166,29 @@ function ActionFields({ action, onChange, mediaFiles = [], gamerules = [] }) {
   switch (action.type) {
     case 'minecraft':
       return (
-        <label className="field">
-          <span>Un comando por línea, sin “/”</span>
-          <textarea
-            rows={Math.max(2, (action.commands ?? []).length)}
-            value={(action.commands ?? []).join('\n')}
-            onChange={(e) => set({ commands: e.target.value.split('\n') })}
-            placeholder="execute at {player} run summon minecraft:zombie ~3 ~ ~3"
-            spellCheck={false}
-            className="mono"
-          />
-        </label>
+        <>
+          <label className="field">
+            <span>Un comando por línea, sin “/”</span>
+            <textarea
+              rows={Math.max(2, Math.min(8, (action.commands ?? []).length + 1))}
+              value={(action.commands ?? []).join('\n')}
+              onChange={(e) => set({ commands: e.target.value.split('\n') })}
+              placeholder="execute at {target} run summon minecraft:zombie ~3 ~ ~3"
+              spellCheck={false}
+              className="mono"
+            />
+          </label>
+          <div className="field-row repeat-row">
+            <label className="field narrow">
+              <span>Repetir (veces)</span>
+              <input type="number" min="1" max="100" value={action.repeat ?? 1} onChange={(e) => set({ repeat: Math.min(100, Math.max(1, Math.round(Number(e.target.value) || 1))) })} />
+            </label>
+            <p className="muted small grow">
+              Para hordas: repite todos los comandos. Al azar en cada repetición: <code>{'{azar:-4:4}'}</code> (número, ej. <code>~{'{azar:-4:4}'}</code> para esparcir mobs)
+              y <code>{'{elegir:bread|apple|cooked_beef}'}</code> (una opción).
+            </p>
+          </div>
+        </>
       );
     case 'announce':
       return (
@@ -230,6 +253,19 @@ function ActionFields({ action, onChange, mediaFiles = [], gamerules = [] }) {
               {mediaFiles.filter((f) => f.type === 'sound').map((f) => <option key={f.name} value={f.name}>{f.name}</option>)}
             </select>
           </label>
+        </div>
+      );
+    case 'caos':
+      return (
+        <div className="field-row">
+          <label className="field narrow">
+            <span>Durante (minutos)</span>
+            <input type="number" min="1" max="120" value={Math.round((action.seconds ?? 600) / 60)} onChange={(e) => set({ seconds: Math.max(1, Math.min(120, Number(e.target.value) || 10)) * 60 })} />
+          </label>
+          <p className="muted small grow field-note">
+            Enciende el modo caos con las reglas de su lista (página Modo caos) y se apaga solo. Si ya estaba encendido por tiempo, se suma.
+            Si lo encendiste tú a mano, no lo apaga.
+          </p>
         </div>
       );
     case 'gamerule': {

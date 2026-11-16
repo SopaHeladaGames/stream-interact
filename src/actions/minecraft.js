@@ -53,14 +53,38 @@ export class MinecraftRcon {
   }
 }
 
-/** Acción "minecraft": ejecuta una lista de comandos (sin la "/" inicial). */
+/**
+ * Funciones al azar dentro de un comando (se calculan en cada repetición):
+ *   {azar:-4:4}            → un número entero entre -4 y 4 (para esparcir mobs: ~{azar:-4:4})
+ *   {elegir:bread|apple}   → una de las opciones
+ */
+export function randomize(text) {
+  return text
+    .replace(/\{azar:(-?\d+):(-?\d+)\}/g, (_m, a, b) => {
+      const lo = Math.min(Number(a), Number(b)); const hi = Math.max(Number(a), Number(b));
+      return String(lo + Math.floor(Math.random() * (hi - lo + 1)));
+    })
+    .replace(/\{elegir:([^{}]+)\}/g, (_m, list) => {
+      const opts = list.split('|').map((o) => o.trim()).filter(Boolean);
+      return opts[Math.floor(Math.random() * opts.length)] ?? '';
+    });
+}
+
+/**
+ * Acción "minecraft": ejecuta una lista de comandos (sin la "/" inicial).
+ * repeat: cuántas veces repetir la lista (hordas de mobs), máximo 100.
+ */
 export function minecraftAction(mc) {
   return async (action, vars) => {
-    for (const template of action.commands ?? []) {
-      const command = fill(template, vars).trim().replace(/^\//, '');
-      if (!command) continue;
-      const response = await mc.send(command);
-      log.action(`/${command}${response ? `  →  ${response}` : ''}`);
+    const times = Math.min(100, Math.max(1, Math.round(Number(action.repeat) || 1)));
+    for (let i = 0; i < times; i++) {
+      for (const template of action.commands ?? []) {
+        const command = randomize(fill(template, vars)).trim().replace(/^\//, '');
+        if (!command) continue;
+        const response = await mc.send(command);
+        // Con repeticiones solo se registra la primera, para no llenar el registro
+        if (i === 0) log.action(`/${command}${response ? `  →  ${response}` : ''}${times > 1 ? `  (×${times})` : ''}`);
+      }
     }
   };
 }

@@ -155,6 +155,37 @@ export default function Reglas() {
                 </div>
       </div>
 
+      <h2>Bits y donaciones</h2>
+      <div className="card settings">
+        <p className="muted small">
+          Cuántos bits vale cada unidad de moneda, para las reglas de bits que también aceptan donaciones.
+          Ejemplo: con USD = 100, una donación de $5 USD cuenta como 500 bits.
+        </p>
+        <div className="field-row">
+          {Object.entries(draft.settings.bitsPerCurrency ?? { USD: 100, MXN: 5 }).map(([cur, rate]) => (
+            <label key={cur} className="field narrow">
+              <span>Bits por 1 {cur}</span>
+              <div className="row gap">
+                <input type="number" min="0" step="0.1" value={rate}
+                  onChange={(e) => setSetting('bitsPerCurrency', { ...(draft.settings.bitsPerCurrency ?? { USD: 100, MXN: 5 }), [cur]: Number(e.target.value) })} />
+                <button className="icon-btn danger" title={`Quitar ${cur}`}
+                  onClick={() => { const next = { ...(draft.settings.bitsPerCurrency ?? { USD: 100, MXN: 5 }) }; delete next[cur]; setSetting('bitsPerCurrency', next); }}>✕</button>
+              </div>
+            </label>
+          ))}
+          <label className="field narrow">
+            <span>Agregar moneda</span>
+            <input placeholder="EUR" maxLength={3} onKeyDown={(e) => {
+              const cur = e.currentTarget.value.toUpperCase().replace(/[^A-Z]/g, '');
+              if (e.key === 'Enter' && cur.length === 3) {
+                setSetting('bitsPerCurrency', { ...(draft.settings.bitsPerCurrency ?? { USD: 100, MXN: 5 }), [cur]: 100 });
+                e.currentTarget.value = '';
+              }
+            }} />
+          </label>
+        </div>
+      </div>
+
       <h2>Jugadores y el chat</h2>
       <JugadoresChat />
     </>

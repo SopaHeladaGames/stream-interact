@@ -8,11 +8,12 @@ export const TRIGGERS = {
 };
 
 export const ACTIONS = {
-  minecraft: { label: 'Comandos de Minecraft', defaults: { commands: [''] } },
+  minecraft: { label: 'Comandos de Minecraft', defaults: { commands: [''], repeat: 1 } },
   announce: { label: 'Mensaje en Minecraft', defaults: { text: '', color: 'yellow' } },
   title: { label: 'Título en pantalla', defaults: { title: '', subtitle: '', color: 'red' } },
   chat: { label: 'Responder en el chat', defaults: { message: '' } },
   overlay: { label: 'Alerta en overlay', defaults: { title: '{user}', subtitle: '', color: '', image: '', sound: '' } },
+  caos: { label: 'Activar modo caos', defaults: { seconds: 600 } },
   gamerule: { label: 'Regla del mundo', defaults: { rule: 'natural_health_regeneration', value: false, seconds: 300, endMessage: '' } },
   wait: { label: 'Esperar', defaults: { ms: 1000 } }
 };
@@ -34,8 +35,9 @@ export const VARIABLES = ['{user}', '{target}', '{player}', '{input}', '{amount}
 
 export function describeTrigger(t = {}) {
   if (t.type === 'cheer') {
-    if (t.minAmount && t.maxAmount) return `${t.minAmount}–${t.maxAmount} bits`;
-    return t.minAmount ? `${t.minAmount}+ bits` : 'Cualquier cheer';
+    const plus = t.includeDonations ? ' (+ donaciones)' : '';
+    if (t.minAmount && t.maxAmount) return `${t.minAmount}–${t.maxAmount} bits${plus}`;
+    return t.minAmount ? `${t.minAmount}+ bits${plus}` : `Cualquier cheer${plus}`;
   }
   if (t.type === 'donation') {
     const cur = t.currency ? ` ${t.currency}` : '';

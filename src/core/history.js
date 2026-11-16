@@ -76,6 +76,13 @@ export class HistoryStore {
     return sessions.reverse().slice(0, limit).map((s) => ({ ...s, start: new Date(s.start).toISOString(), end: new Date(s.end).toISOString() }));
   }
 
+  /** Cuántas veces se ejecutó una regla en el directo actual (para "una vez por directo"). */
+  countThisStream(ruleId) {
+    const s = this.sessions(1)[0];
+    if (!s || Date.now() - Date.parse(s.end) > SESSION_GAP) return 0; // ya empezó otro directo
+    return this.between(Date.parse(s.start)).filter((r) => r.rule === ruleId && r.status === 'ok' && !r.test).length;
+  }
+
   /** Rango a partir de lo que pide el panel. */
   range({ range = 'session', from, to } = {}) {
     const now = Date.now();

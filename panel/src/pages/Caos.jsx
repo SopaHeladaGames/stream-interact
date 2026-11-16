@@ -103,7 +103,7 @@ export default function Caos() {
       <div className="cards">
         <div className="card status">
           <div className="row between"><span className="card-title">Estado</span><span className={`dot ${status.running ? 'warn' : 'off'}`} /></div>
-          <div className="card-detail">{status.running ? 'Activo' : 'Apagado'}</div>
+          <div className="card-detail">{status.running ? (status.autoStopAt ? `Activo · se apaga a las ${new Date(status.autoStopAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })}` : 'Activo') : 'Apagado'}</div>
         </div>
         <div className="card status">
           <div className="row between"><span className="card-title">Próximo evento</span></div>

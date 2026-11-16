@@ -439,6 +439,8 @@ select.invalid { border-color: var(--error); color: var(--error); }
 .gamerule-row .grow { flex: 1; }
 .gamerule-name { font-size: 11px; }
 .gamerule-num { width: 80px; }
+.repeat-row { margin-top: 8px; margin-bottom: 0; align-items: center; }
+.repeat-row .grow { flex: 1; margin: 0; }
 .temp-rules { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .temp-rule { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 179, 71, .1); border: 1px solid rgba(255, 179, 71, .3); font-size: 13.5px; }
 .temp-rule > span:first-child { flex: 1; }

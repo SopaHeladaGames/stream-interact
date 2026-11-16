@@ -49,8 +49,38 @@ export class ChaosMode {
     return this.status();
   }
 
+  /**
+   * Enciende el modo caos por un tiempo (acción "caos" de una regla, ej. una recompensa).
+   * Si ya estaba encendido por tiempo, se suma; si lo encendiste tú a mano, se respeta y no se apaga solo.
+   */
+  startFor(seconds, by = '') {
+    const ms = Math.max(10, Number(seconds) || 600) * 1000;
+    if (this.running && !this.autoStopAt) {
+      this.notify.chat(`🌀 El modo caos ya está activo.`);
+      return this.status();
+    }
+    const wasRunning = this.running;
+    if (!wasRunning) {
+      if (this.pool().length === 0) throw httpError(400, 'El modo caos no tiene reglas en su lista (página Modo caos)');
+      this.running = true;
+      this.lastSkip = null;
+      this.#schedule();
+    }
+    this.autoStopAt = (wasRunning ? Math.max(this.autoStopAt, Date.now()) : Date.now()) + ms;
+    clearTimeout(this.autoStopTimer);
+    this.autoStopTimer = setTimeout(() => this.stop(), this.autoStopAt - Date.now());
+    const mins = Math.round((this.autoStopAt - Date.now()) / 60000);
+    const who = by ? ` (gracias a ${by})` : '';
+    this.notify.chat(wasRunning ? `🌀 ¡El modo caos se alarga! Ahora quedan ${mins} min${who}.` : `🌀 ¡Modo caos ACTIVADO por ${mins} min${who}! Cualquier cosa puede pasar…`);
+    if (!wasRunning) this.notify.title('MODO CAOS', `${mins} minutos${by ? ` · ${by}` : ''}`, 'dark_red');
+    log.info(`🌀 Modo caos por ${mins} min${who}`);
+    return this.status();
+  }
+
   stop({ silent = false } = {}) {
     clearTimeout(this.timer);
+    clearTimeout(this.autoStopTimer);
+    this.autoStopAt = null;
     const wasRunning = this.running;
     this.running = false;
     this.nextAt = null;
@@ -78,6 +108,7 @@ export class ChaosMode {
       running: this.running,
       nextAt: this.nextAt ? new Date(this.nextAt).toISOString() : null,
       remainingMs: this.nextAt ? Math.max(0, this.nextAt - Date.now()) : null,
+      autoStopAt: this.autoStopAt ? new Date(this.autoStopAt).toISOString() : null,
       last: this.last,
       lastSkip: this.lastSkip,
       config: this.store.chaos,

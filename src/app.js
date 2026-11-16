@@ -66,6 +66,8 @@ export async function startApp(options = {}) {
 
   const actions = {
     gamerule: (action, vars) => gamerules.applyAction(action, vars),
+    // Encender el modo caos por un tiempo (chaos se crea más abajo; se usa cuando ya existe)
+    caos: async (action, vars) => { chaos.startFor(action.seconds, vars.user); },
     minecraft: minecraftAction(mc),
     announce: announceAction(mc),
     title: titleAction(mc),
@@ -88,6 +90,7 @@ export async function startApp(options = {}) {
   // Historial de lo que hizo el chat (estadísticas): data/historial/AAAA-MM.jsonl
   const history = new HistoryStore(path.resolve('data', 'historial'));
   engine.onRecord((rec) => history.record(rec));
+  engine.countThisStream = (ruleId) => history.countThisStream(ruleId);
 
   // Votaciones y modo caos: avisan en el chat de Twitch y dentro de Minecraft
   const notify = {

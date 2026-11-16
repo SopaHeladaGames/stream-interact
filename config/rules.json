@@ -1,319 +1,336 @@
 {
-  "_ayuda": "Triggers: reward | command | cheer. Acciones: minecraft (comandos sin '/'), announce (mensaje con color en Minecraft), title (texto grande en pantalla), chat (responder en Twitch), wait (pausa en ms). Variables: {player} {user} {input} {amount} {platform}. Colores: black, dark_blue, dark_green, dark_aqua, dark_red, dark_purple, gold, gray, dark_gray, blue, green, aqua, red, light_purple, yellow, white. Guarda y se recarga solo.",
+  "_ayuda": "Se edita mejor desde el panel (página Reglas). Variables: {user} {target} {player} {input} {amount} {currency} {money} {platform}. En comandos: {azar:-4:4} y {elegir:a|b|c}.",
   "settings": {
     "cooldownReplies": true,
     "helpCommand": "!comandos",
-    "helpCooldownMs": 30000
+    "helpCooldownMs": 30000,
+    "pauseRewards": true,
+    "bitsPerCurrency": {
+      "USD": 100,
+      "MXN": 5
+    }
   },
   "rules": [
     {
-      "id": "zombie",
+      "id": "zombis",
       "trigger": {
-        "type": "reward",
-        "name": "Zombie time"
+        "type": "command",
+        "name": "!zombis"
       },
-      "cooldownMs": 10000,
+      "target": "random",
+      "userCooldownMs": 60000,
       "actions": [
         {
           "type": "minecraft",
           "commands": [
-            "execute at {target} run summon minecraft:zombie ~3 ~ ~3"
-          ]
+            "execute at {target} run summon minecraft:zombie ~{azar:-4:4} ~ ~{azar:-4:4} {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b,active_effects:[{id:\"minecraft:strength\",amplifier:0b,duration:-1,show_particles:0b},{id:\"minecraft:speed\",amplifier:0b,duration:-1,show_particles:0b}]}"
+          ],
+          "repeat": 6
         },
         {
           "type": "announce",
-          "text": "{user} te mandó un zombie",
+          "text": "{user} le mandó una horda de zombis a {target}",
+          "color": "gold"
+        },
+        {
+          "type": "chat",
+          "message": "🧟 {user} le mandó una horda de zombis a {target}"
+        }
+      ]
+    },
+    {
+      "id": "cholos",
+      "trigger": {
+        "type": "command",
+        "name": "!cholos"
+      },
+      "target": "random",
+      "cooldownMs": 300000,
+      "actions": [
+        {
+          "type": "minecraft",
+          "commands": [
+            "execute at {target} run summon minecraft:wither_skeleton ~{azar:-4:4} ~ ~{azar:-4:4} {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b,active_effects:[{id:\"minecraft:strength\",amplifier:0b,duration:-1,show_particles:0b}],equipment:{head:{id:\"minecraft:iron_helmet\",count:1},chest:{id:\"minecraft:iron_chestplate\",count:1},legs:{id:\"minecraft:iron_leggings\",count:1},feet:{id:\"minecraft:iron_boots\",count:1},mainhand:{id:\"minecraft:stone_sword\",count:1}},drop_chances:{head:0f,chest:0f,legs:0f,feet:0f,mainhand:0f}}"
+          ],
+          "repeat": 3
+        },
+        {
+          "type": "announce",
+          "text": "{user} mandó a los cholos por {target}",
+          "color": "dark_red"
+        },
+        {
+          "type": "chat",
+          "message": "💀 {user} mandó a los cholos por {target}"
+        }
+      ]
+    },
+    {
+      "id": "creepers",
+      "trigger": {
+        "type": "command",
+        "name": "!creepers"
+      },
+      "target": "random",
+      "cooldownMs": 600000,
+      "actions": [
+        {
+          "type": "minecraft",
+          "commands": [
+            "execute at {target} run summon minecraft:creeper ~{azar:-6:6} ~ ~{azar:-6:6} {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b,active_effects:[{id:\"minecraft:speed\",amplifier:0b,duration:-1,show_particles:0b}]}"
+          ],
+          "repeat": 10
+        },
+        {
+          "type": "title",
+          "title": "¡CREEPERS!",
+          "subtitle": "{user} rodeó a {target}",
           "color": "green"
         },
         {
           "type": "chat",
-          "message": "🧟 {user} invocó un zombie a {target}"
+          "message": "💥 {user} rodeó a {target} con 10 creepers"
         }
       ]
     },
     {
-      "id": "creeper",
+      "id": "hambre",
       "trigger": {
-        "type": "reward",
-        "name": "Creeper sorpresa"
+        "type": "command",
+        "name": "!hambre"
       },
-      "cooldownMs": 60000,
-      "actions": [
-        {
-          "type": "title",
-          "title": "¡Cuidado!",
-          "subtitle": "{user} te mandó un creeper",
-          "color": "red"
-        },
-        {
-          "type": "wait",
-          "ms": 1500
-        },
-        {
-          "type": "minecraft",
-          "commands": [
-            "execute at {target} run summon minecraft:creeper ~-2 ~ ~-2"
-          ]
-        },
-        {
-          "type": "chat",
-          "message": "💥 {user} soltó un creeper junto a {target}"
-        }
-      ]
-    },
-    {
-      "id": "regalo",
-      "trigger": {
-        "type": "reward",
-        "name": "Regalar comida"
-      },
-      "cooldownMs": 5000,
+      "target": "all",
+      "cooldownMs": 1800000,
       "actions": [
         {
           "type": "minecraft",
           "commands": [
-            "give {player} minecraft:cooked_beef 8"
-          ]
+            "effect give {target} minecraft:hunger 120 1"
+          ],
+          "repeat": 1
         },
         {
           "type": "announce",
-          "text": "{user} te regaló comida",
+          "text": "{user} le dio hambre a todos por 2 minutos",
+          "color": "yellow"
+        },
+        {
+          "type": "chat",
+          "message": "🍗 {user} le dio hambre a todos por 2 minutos"
+        }
+      ]
+    },
+    {
+      "id": "esqueletos",
+      "trigger": {
+        "type": "command",
+        "name": "!esqueletos"
+      },
+      "target": "all",
+      "cooldownMs": 300000,
+      "actions": [
+        {
+          "type": "minecraft",
+          "commands": [
+            "execute at {target} run summon minecraft:skeleton ~{azar:-5:5} ~ ~{azar:-5:5} {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b,active_effects:[{id:\"minecraft:speed\",amplifier:0b,duration:-1,show_particles:0b}],equipment:{mainhand:{id:\"minecraft:bow\",count:1}},drop_chances:{mainhand:0f}}"
+          ],
+          "repeat": 4
+        },
+        {
+          "type": "announce",
+          "text": "{user} mandó esqueletos a todos",
+          "color": "gray"
+        },
+        {
+          "type": "chat",
+          "message": "🏹 {user} mandó una patrulla de esqueletos a todos"
+        }
+      ]
+    },
+    {
+      "id": "lento",
+      "trigger": {
+        "type": "command",
+        "name": "!lento"
+      },
+      "target": "all",
+      "cooldownMs": 1200000,
+      "actions": [
+        {
+          "type": "minecraft",
+          "commands": [
+            "effect give {target} minecraft:slowness 10 1"
+          ],
+          "repeat": 1
+        },
+        {
+          "type": "announce",
+          "text": "{user} puso a todos en cámara lenta",
+          "color": "aqua"
+        },
+        {
+          "type": "chat",
+          "message": "🐢 {user} puso a todos en cámara lenta 10 segundos"
+        }
+      ]
+    },
+    {
+      "id": "comida",
+      "trigger": {
+        "type": "reward",
+        "name": "Comida"
+      },
+      "target": "all",
+      "cooldownMs": 300000,
+      "actions": [
+        {
+          "type": "minecraft",
+          "commands": [
+            "give {target} minecraft:{elegir:cooked_beef|cooked_porkchop|cooked_chicken|cooked_mutton|beef|porkchop|chicken|mutton|bread|baked_potato|potato|carrot|apple|beetroot|melon_slice|sweet_berries|pumpkin_pie} 16"
+          ],
+          "repeat": 1
+        },
+        {
+          "type": "title",
+          "title": "{user} te vio con hambre",
+          "subtitle": "toma",
           "color": "gold"
         }
       ]
     },
     {
-      "id": "zombie-cmd",
-      "trigger": {
-        "type": "command",
-        "name": "!zombie"
-      },
-      "cooldownMs": 30000,
-      "userCooldownMs": 120000,
-      "actions": [
-        {
-          "type": "minecraft",
-          "commands": [
-            "execute at {target} run summon minecraft:zombie ~3 ~ ~3 {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b}"
-          ]
-        },
-        {
-          "type": "announce",
-          "text": "{user} invocó un zombie cerca de ti",
-          "color": "green"
-        }
-      ]
-    },
-    {
-      "id": "lluvia",
-      "trigger": {
-        "type": "command",
-        "name": "!lluvia"
-      },
-      "cooldownMs": 120000,
-      "userCooldownMs": 300000,
-      "actions": [
-        {
-          "type": "minecraft",
-          "commands": [
-            "weather thunder 60s"
-          ]
-        },
-        {
-          "type": "announce",
-          "text": "{user} invocó una tormenta",
-          "color": "aqua"
-        },
-        {
-          "type": "chat",
-          "message": "⛈️ {user} invocó una tormenta de 60s"
-        }
-      ]
-    },
-    {
-      "id": "velocidad",
-      "trigger": {
-        "type": "command",
-        "name": "!rapido"
-      },
-      "cooldownMs": 60000,
-      "actions": [
-        {
-          "type": "minecraft",
-          "commands": [
-            "effect give {player} minecraft:speed 20 2"
-          ]
-        },
-        {
-          "type": "announce",
-          "text": "{user} te dio velocidad por 20s",
-          "color": "yellow"
-        },
-        {
-          "type": "chat",
-          "message": "⚡ {user} le dio velocidad a {player} por 20s"
-        }
-      ]
-    },
-    {
-      "id": "salto",
-      "trigger": {
-        "type": "command",
-        "name": "!salto"
-      },
-      "cooldownMs": 60000,
-      "actions": [
-        {
-          "type": "minecraft",
-          "commands": [
-            "effect give {player} minecraft:jump_boost 20 3"
-          ]
-        },
-        {
-          "type": "announce",
-          "text": "{user} te dio súper salto por 20s",
-          "color": "light_purple"
-        }
-      ]
-    },
-    {
-      "id": "skeleton",
-      "trigger": {
-        "type": "command",
-        "name": "!esqueleto"
-      },
-      "cooldownMs": 3000,
-      "actions": [
-        {
-          "type": "minecraft",
-          "commands": [
-            "execute at {target} run summon minecraft:skeleton ~3 ~ ~3"
-          ]
-        },
-        {
-          "type": "announce",
-          "text": "{user} envió un esqueleto",
-          "color": "yellow"
-        },
-        {
-          "type": "chat",
-          "message": "{user} le envió un esqueleto al sopa"
-        }
-      ]
-    },
-    {
-      "id": "bits-grandes",
-      "trigger": {
-        "type": "cheer",
-        "minAmount": 100
-      },
-      "actions": [
-        {
-          "type": "title",
-          "title": "¡REFUERZOS!",
-          "subtitle": "{user} donó {amount} bits",
-          "color": "dark_red"
-        },
-        {
-          "type": "minecraft",
-          "commands": [
-            "execute at {player} run summon minecraft:wither_skeleton ~4 ~ ~",
-            "execute at {player} run summon minecraft:wither_skeleton ~-4 ~ ~"
-          ]
-        },
-        {
-          "type": "chat",
-          "message": "💀 ¡Gracias {user} por {amount} bits! Refuerzos en camino"
-        }
-      ]
-    },
-    {
-      "id": "bits-chicos",
-      "trigger": {
-        "type": "cheer",
-        "minAmount": 100
-      },
-      "actions": [
-        {
-          "type": "minecraft",
-          "commands": [
-            "give {player} minecraft:diamond 1"
-          ]
-        },
-        {
-          "type": "announce",
-          "text": "¡Gracias {user} por {amount} bits!",
-          "color": "aqua"
-        },
-        {
-          "type": "chat",
-          "message": "💎 ¡Gracias {user} por {amount} bits!"
-        }
-      ]
-    },
-    {
-      "id": "regla-1",
-      "trigger": {
-        "type": "command",
-        "name": "!hambre"
-      },
-      "cooldownMs": 0,
-      "actions": [
-        {
-          "type": "announce",
-          "text": "{user} le dio hambre al sopa",
-          "color": "yellow"
-        },
-        {
-          "type": "minecraft",
-          "commands": [
-            "effect give {target} minecraft:hunger 300 1"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "regla-2",
+      "id": "patrulla-warden",
       "trigger": {
         "type": "reward",
-        "name": "Madera"
+        "name": "Patrulla warden"
       },
-      "cooldownMs": 30000,
+      "cooldownMs": 3600000,
       "actions": [
         {
-          "type": "announce",
-          "text": "{user} envió un refuerzo de madera",
-          "color": "white"
+          "type": "minecraft",
+          "commands": [
+            "execute at {target} run summon minecraft:warden ~{azar:-6:6} ~ ~{azar:-6:6} {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b}"
+          ],
+          "repeat": 1
         },
         {
           "type": "minecraft",
           "commands": [
-            "give {player} minecraft:oak_log 64"
-          ]
+            "execute at {target} run summon minecraft:skeleton ~{azar:-5:5} ~ ~{azar:-5:5} {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b,active_effects:[{id:\"minecraft:speed\",amplifier:0b,duration:-1,show_particles:0b}],equipment:{head:{id:\"minecraft:iron_helmet\",count:1},chest:{id:\"minecraft:iron_chestplate\",count:1},legs:{id:\"minecraft:iron_leggings\",count:1},feet:{id:\"minecraft:iron_boots\",count:1},mainhand:{id:\"minecraft:bow\",count:1}},drop_chances:{head:0f,chest:0f,legs:0f,feet:0f,mainhand:0f}}"
+          ],
+          "repeat": 4
+        },
+        {
+          "type": "title",
+          "title": "PATRULLA WARDEN",
+          "subtitle": "cortesía de {user}",
+          "color": "dark_aqua"
+        },
+        {
+          "type": "chat",
+          "message": "👁️ {user} invocó una patrulla warden. Suerte, {target}..."
         }
       ]
     },
     {
-      "id": "zombie2",
+      "id": "modo-caos",
       "trigger": {
-        "type": "command",
-        "name": "!zombie2"
+        "type": "reward",
+        "name": "Modo caos"
       },
-      "cooldownMs": 1000,
+      "maxPerStream": 1,
       "actions": [
         {
-          "type": "announce",
-          "text": "{user} le mandó un chombie a {target}",
-          "color": "yellow"
-        },
+          "type": "caos",
+          "seconds": 600
+        }
+      ]
+    },
+    {
+      "id": "bits-1000",
+      "trigger": {
+        "type": "cheer",
+        "minAmount": 1000,
+        "includeDonations": true
+      },
+      "target": "random",
+      "actions": [
         {
           "type": "minecraft",
           "commands": [
-            "execute at {target} run summon minecraft:zombie ~3 ~ ~3"
-          ]
+            "execute at {target} run summon minecraft:skeleton ~{azar:-8:8} ~ ~{azar:-8:8} {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b,equipment:{mainhand:{id:\"minecraft:bow\",count:1}},drop_chances:{mainhand:0f}}"
+          ],
+          "repeat": 50
+        },
+        {
+          "type": "title",
+          "title": "¡50 ESQUELETOS!",
+          "subtitle": "de {user} para {target}",
+          "color": "gray"
+        },
+        {
+          "type": "chat",
+          "message": "🏹 ¡{user} mandó 50 esqueletos a {target}! Gracias por el apoyo 💜"
         }
-      ],
-      "target": "chat"
+      ]
+    },
+    {
+      "id": "bits-500",
+      "trigger": {
+        "type": "cheer",
+        "minAmount": 500,
+        "maxAmount": 999,
+        "includeDonations": true
+      },
+      "cooldownMs": 1200000,
+      "actions": [
+        {
+          "type": "minecraft",
+          "commands": [
+            "execute at {target} run summon minecraft:wither ~ ~6 ~ {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b}"
+          ],
+          "repeat": 1
+        },
+        {
+          "type": "title",
+          "title": "¡WITHER!",
+          "subtitle": "de {user}",
+          "color": "dark_purple"
+        },
+        {
+          "type": "chat",
+          "message": "☠️ ¡{user} invocó un Wither! Gracias por el apoyo 💜"
+        }
+      ]
+    },
+    {
+      "id": "bits-100",
+      "trigger": {
+        "type": "cheer",
+        "minAmount": 100,
+        "maxAmount": 499,
+        "includeDonations": true
+      },
+      "target": "random",
+      "cooldownMs": 20000,
+      "actions": [
+        {
+          "type": "minecraft",
+          "commands": [
+            "execute at {target} run summon minecraft:zombie ~{azar:-6:6} ~ ~{azar:-6:6} {CustomName:{text:\"{user}\",color:\"gold\"},CustomNameVisible:1b}"
+          ],
+          "repeat": 20
+        },
+        {
+          "type": "announce",
+          "text": "{user} mandó 20 zombis a {target}",
+          "color": "gold"
+        },
+        {
+          "type": "chat",
+          "message": "🧟 ¡{user} mandó 20 zombis a {target}! Gracias por el apoyo 💜"
+        }
+      ]
     }
   ]
 }

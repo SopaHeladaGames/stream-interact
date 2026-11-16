@@ -321,6 +321,16 @@ En la página **Servidor**, tarjeta **Respaldos** (siempre de la instalación ac
 - Se guardan como `.zip` en `mc-backups\<instalación>` junto a la carpeta del servidor (por ejemplo `C:\Users\vitro\dev\mc-backups\principal`). En los ajustes puedes cambiar la carpeta, por ejemplo a otro disco.
 - Usa el `tar.exe` que trae Windows 10/11; no hay que instalar nada. Ajustes en `config/respaldos.json`.
 
+## Hordas, cosas al azar, bits ↔ donaciones y límites
+
+- **Repetir:** la acción *Comandos de Minecraft* tiene *Repetir (veces)* (1–100) para hordas.
+- **Al azar dentro de un comando** (cambia en cada repetición): `{azar:-4:4}` da un número entre -4 y 4 (para esparcir mobs: `~{azar:-4:4} ~ ~{azar:-4:4}`); `{elegir:bread|apple|cooked_beef}` elige una opción.
+- **Mobs con el nombre de quien los mandó** (Minecraft 1.21.5 o más nuevo): `{CustomName:{text:"{user}",color:"gold"},CustomNameVisible:1b}`. Armadura: `equipment:{head:{id:"minecraft:iron_helmet",count:1},…}`; efectos: `active_effects:[{id:"minecraft:speed",amplifier:0b,duration:-1}]`.
+- **Bits y donaciones en la misma regla:** en una regla de bits marca *También donaciones por su equivalente*. La tabla está en Reglas → Ajustes → *Bits y donaciones* (por defecto 1 USD = 100 bits, 1 MXN = 5 bits). Pon las reglas de más bits primero (o usa máximo).
+- **Bits y donaciones nunca se pierden:** si llegan durante el cooldown, se ejecutan cuando termine y se avisa en el chat.
+- **Máximo por directo:** cuántas veces se puede usar una regla en un mismo directo (si se pasa, se devuelven los puntos).
+- **Acción *Activar modo caos*:** lo enciende por X minutos con las reglas de su lista y se apaga solo.
+
 ## Jugar con más gente: a quién le llega cada regla
 
 Cada regla tiene **A quién le llega** (página Reglas):
