@@ -103,6 +103,7 @@ export class GameruleManager {
     const sameValue = current && current.value === value;
     this.temps[rule.id] = {
       value, original,
+      since: sameValue ? (current.since ?? now) : now,
       until: (sameValue ? Math.max(current.until, now) : now) + seconds * 1000,
       installation: this.getInstallationId(),
       user: vars.user ?? '',

@@ -161,7 +161,7 @@ export class RulesEngine {
       if (effectiveMode !== 'me') log.info(`🎯 "${this.ruleLabel(rule.id)}" → ${t.display}`);
       // Avisar (overlay) justo cuando la regla se ejecuta, en el mismo orden que el juego
       for (const fn of this.runListeners) {
-        try { fn(rule, event, this.ruleLabel(rule.id)); } catch (err) { log.error('Error en aviso de regla:', err.message); }
+        try { fn(rule, event, this.ruleLabel(rule.id), effectiveMode !== 'me' ? t.display : null); } catch (err) { log.error('Error en aviso de regla:', err.message); }
       }
       try {
         for (const action of rule.actions ?? []) {

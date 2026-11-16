@@ -66,6 +66,7 @@ export class ChaosMode {
       this.lastSkip = null;
       this.#schedule();
     }
+    if (!wasRunning) this.autoStartAt = Date.now();
     this.autoStopAt = (wasRunning ? Math.max(this.autoStopAt, Date.now()) : Date.now()) + ms;
     clearTimeout(this.autoStopTimer);
     this.autoStopTimer = setTimeout(() => this.stop(), this.autoStopAt - Date.now());
@@ -109,6 +110,7 @@ export class ChaosMode {
       nextAt: this.nextAt ? new Date(this.nextAt).toISOString() : null,
       remainingMs: this.nextAt ? Math.max(0, this.nextAt - Date.now()) : null,
       autoStopAt: this.autoStopAt ? new Date(this.autoStopAt).toISOString() : null,
+      autoStartAt: this.autoStopAt && this.autoStartAt ? new Date(this.autoStartAt).toISOString() : null,
       last: this.last,
       lastSkip: this.lastSkip,
       config: this.store.chaos,

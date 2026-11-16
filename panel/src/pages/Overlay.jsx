@@ -3,9 +3,11 @@ import { api } from '../api.js';
 
 const ORIGIN = 'http://localhost:3000';
 const URLS = [
-  { id: 'todo', label: 'Todo (alertas + votación)', path: '/overlay', hint: 'Una sola fuente para todo. La más sencilla.' },
+  { id: 'todo', label: 'Todo (alertas, votación, contadores y top)', path: '/overlay', hint: 'Una sola fuente para todo. La más sencilla.' },
   { id: 'alertas', label: 'Solo alertas', path: '/overlay?widget=alertas', hint: 'Para acomodar las alertas por separado.' },
-  { id: 'votacion', label: 'Solo votación', path: '/overlay?widget=votacion', hint: 'Para acomodar la votación por separado.' }
+  { id: 'votacion', label: 'Solo votación', path: '/overlay?widget=votacion', hint: 'Para acomodar la votación por separado.' },
+  { id: 'estado', label: 'Solo contadores', path: '/overlay?widget=estado', hint: 'Reglas del mundo temporales y modo caos con cuenta regresiva.' },
+  { id: 'top', label: 'Solo top del directo', path: '/overlay?widget=top', hint: 'Quién dio más bits y donaciones en este directo.' }
 ];
 const KINDS = [
   { id: 'reward', label: 'Canje', icon: '🎁' },
@@ -146,7 +148,7 @@ export default function Overlay() {
 
   const images = files.filter((f) => f.type === 'image');
   const sounds = files.filter((f) => f.type === 'sound');
-  const previewUrl = `/overlay?preview=1&demo=${demoKind}${demoPoll ? '&demopoll=1' : '&widget=alertas'}`;
+  const previewUrl = `/overlay?preview=1&demo=${demoKind}${demoPoll ? '&demopoll=1&demoextras=1' : '&widget=alertas'}`;
 
   return (
     <>
@@ -213,6 +215,46 @@ export default function Overlay() {
               <h3>Votación</h3>
               <PositionPicker value={config.pollPosition} onChange={(pollPosition) => change({ pollPosition })} />
               <Slider label="Tamaño" value={config.pollScale} min={0.4} max={2} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(pollScale) => change({ pollScale })} />
+            </div>
+            <div>
+              <div className="row between">
+                <h3>Contadores</h3>
+                <label className="switch" title="Reglas del mundo temporales y modo caos con cuenta regresiva">
+                  <input type="checkbox" checked={config.statusEnabled} onChange={(e) => change({ statusEnabled: e.target.checked })} /><span />
+                </label>
+              </div>
+              <p className="muted small">Cuenta regresiva de las reglas del mundo temporales (ej. “sin regeneración 4:32”) y del modo caos.</p>
+              <PositionPicker value={config.statusPosition} onChange={(statusPosition) => change({ statusPosition })} />
+              <Slider label="Tamaño" value={config.statusScale} min={0.4} max={2} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(statusScale) => change({ statusScale })} disabled={!config.statusEnabled} />
+            </div>
+            <div>
+              <div className="row between">
+                <h3>Top del directo</h3>
+                <label className="switch" title="Quién dio más bits y donaciones en este directo">
+                  <input type="checkbox" checked={config.topEnabled} onChange={(e) => change({ topEnabled: e.target.checked })} /><span />
+                </label>
+              </div>
+              <p className="muted small">Bits y donaciones del directo actual (las donaciones se ordenan por su equivalente en bits). Aparece en cuanto alguien apoya.</p>
+              <PositionPicker value={config.topPosition} onChange={(topPosition) => change({ topPosition })} />
+              <Slider label="Tamaño" value={config.topScale} min={0.4} max={2} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(topScale) => change({ topScale })} disabled={!config.topEnabled} />
+              <div className="field-row">
+                <label className="field grow">
+                  <span>Título</span>
+                  <input value={config.topTitle} maxLength={40} onChange={(e) => change({ topTitle: e.target.value })} disabled={!config.topEnabled} />
+                </label>
+                <label className="field narrow">
+                  <span>Cuántos</span>
+                  <select value={config.topCount} onChange={(e) => change({ topCount: Number(e.target.value) })} disabled={!config.topEnabled}>
+                    {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div className="span-2">
+              <label className="check">
+                <input type="checkbox" checked={config.showTarget} onChange={(e) => change({ showTarget: e.target.checked })} />
+                En las alertas, mostrar <strong>a quién le tocó</strong> (🎯) cuando una regla o el modo caos eligen a alguien
+              </label>
             </div>
             <div className="span-2">
               <h3>Separación de los bordes de la pantalla</h3>

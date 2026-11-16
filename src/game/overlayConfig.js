@@ -42,6 +42,16 @@ export const OVERLAY_DEFAULTS = {
   radius: 26,
   glow: true,
   colors: { reward: '#9b6bff', cheer: '#ffb347', donation: '#3ddc84', command: '#4cc3ff', poll: '#ffb347', chaos: '#ff4d5e' },
+  // Extras: a quién le tocó, contadores (reglas temporales y modo caos) y top del directo
+  showTarget: true,
+  statusEnabled: true,
+  statusPosition: 'top-right',
+  statusScale: 1,
+  topEnabled: true,
+  topPosition: 'bottom-right',
+  topScale: 1,
+  topCount: 3,
+  topTitle: 'Top del directo',
   // Imágenes y sonidos (nombres de archivo de la carpeta media/)
   imageSize: 'icon',
   media: Object.fromEntries(KINDS.map((k) => [k, { image: '', sound: '' }]))
@@ -95,6 +105,16 @@ export function normalizeOverlay(input = {}) {
     radius: Math.round(num(o.radius, 0, 60, d.radius)),
     glow: o.glow !== false,
     colors: Object.fromEntries(KINDS.map((k) => [k, color(o.colors?.[k], d.colors[k])])),
+
+    showTarget: o.showTarget !== false,
+    statusEnabled: o.statusEnabled !== false,
+    statusPosition: oneOf(o.statusPosition, POSITIONS, d.statusPosition),
+    statusScale: num(o.statusScale, 0.4, 2, d.statusScale),
+    topEnabled: o.topEnabled !== false,
+    topPosition: oneOf(o.topPosition, POSITIONS, d.topPosition),
+    topScale: num(o.topScale, 0.4, 2, d.topScale),
+    topCount: Math.round(num(o.topCount, 1, 5, d.topCount)),
+    topTitle: String(o.topTitle ?? d.topTitle).trim().slice(0, 40) || d.topTitle,
 
     imageSize: oneOf(o.imageSize, ['icon', 'large'], d.imageSize),
     media: Object.fromEntries(KINDS.map((k) => [k, { image: file(o.media?.[k]?.image), sound: file(o.media?.[k]?.sound) }]))

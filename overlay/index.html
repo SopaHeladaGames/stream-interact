@@ -8,7 +8,9 @@
     /overlay                    alertas + votación
     /overlay?widget=alertas     solo alertas
     /overlay?widget=votacion    solo votación
-  Opciones: &sonido=0 (sin sonido)  &preview=1 (fondo de cuadros)  &demo=reward|cheer|donation|command|poll|chaos  &demopoll=1
+    /overlay?widget=estado      solo contadores (reglas del mundo temporales y modo caos)
+    /overlay?widget=top         solo top del directo
+  Opciones: &sonido=0 (sin sonido)  &preview=1 (fondo de cuadros)  &demo=reward|cheer|donation|command|poll|chaos  &demopoll=1  &demoextras=1
 -->
 <style>
   @font-face { font-family: 'SI Inter'; src: url('/overlay/fonts/inter-800.woff2') format('woff2'); font-weight: 800; }
@@ -182,18 +184,55 @@
   .poll-result { font-size: 28em; font-weight: 900; color: #3ddc84; text-align: right; }
   body.font-pixel .poll-q, body.font-pixel .opt-label { line-height: 1.5; }
   @keyframes pulse { to { transform: scale(1.15); } }
+
+  /* ---------- A quién le tocó (dentro de la alerta) ---------- */
+  .alert .target { display: inline-flex; align-items: center; gap: .3em; margin-top: .35em; padding: .12em .55em; border-radius: 999px;
+    font-size: 26em; font-weight: 800; background: var(--soft); border: 2px solid var(--accent); }
+
+  /* ---------- Contadores y top ---------- */
+  #status .scaler { --s: var(--status-scale, 1); width: 470px; }
+  #top .scaler { --s: var(--top-scale, 1); width: 470px; }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .pos-bottom-left .stack, .pos-bottom-center .stack, .pos-bottom-right .stack { flex-direction: column-reverse; }
+  .tcard, .topcard {
+    --accent: #4cc3ff;
+    background: var(--bg); border: var(--border-w) solid var(--accent); border-radius: calc(var(--radius) * .7);
+    padding: 16px 20px 14px; font-size: calc(var(--text-scale) * var(--font-factor) * 1px); position: relative; overflow: hidden;
+  }
+  body.glow .tcard, body.glow .topcard { box-shadow: 0 0 0 5px rgba(0, 0, 0, .2), 0 0 36px var(--glow, rgba(76, 195, 255, .35)), 0 14px 34px rgba(0, 0, 0, .4); }
+  .tcard.enter, .topcard.enter { animation: in-fade calc(.4s / var(--speed)) ease-out both; }
+  .tcard-row { display: flex; align-items: center; gap: 14px; }
+  .tcard-icon { font-size: 34em; flex-shrink: 0; }
+  .tcard-text { flex: 1; min-width: 0; }
+  .tcard-label { font-size: 26em; font-weight: 800; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .tcard-sub { font-size: 20em; font-weight: 700; opacity: .8; }
+  .tcard-time { font-size: 38em; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .tcard-time.ending { color: #ff4d5e; animation: pulse .5s ease-in-out infinite alternate; }
+  .tcard-bar { margin-top: 10px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+  .tcard-bar span { display: block; height: 100%; background: var(--accent); transition: width 1s linear; }
+  .top-title { font-size: 22em; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .top-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+  .top-row + .top-row { border-top: 1px solid rgba(255, 255, 255, .1); }
+  .top-medal { font-size: 30em; width: 1.3em; text-align: center; flex-shrink: 0; }
+  .top-name { flex: 1; min-width: 0; font-size: 28em; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top-amount { font-size: 22em; font-weight: 800; opacity: .9; text-align: right; white-space: nowrap; }
 </style>
 </head>
 <body>
 <div id="alerts" class="layer pos-top-center"><div class="scaler" id="alertBox"></div></div>
 <div id="poll" class="layer pos-bottom-left"><div class="scaler" id="pollBox"></div></div>
+<div id="status" class="layer pos-top-right"><div class="scaler"><div class="stack" id="statusBox"></div></div></div>
+<div id="top" class="layer pos-bottom-right"><div class="scaler" id="topBox"></div></div>
 
 <script>
 (() => {
   const params = new URLSearchParams(location.search);
   const widget = (params.get('widget') || 'todo').toLowerCase();
-  const showAlerts = widget !== 'votacion';
-  const showPoll = widget !== 'alertas';
+  const showAlerts = widget === 'todo' || widget === 'alertas';
+  const showPoll = widget === 'todo' || widget === 'votacion';
+  const showStatusWidget = widget === 'todo' || widget === 'estado';
+  const showTopWidget = widget === 'todo' || widget === 'top';
+  const demoExtras = params.get('demoextras') === '1';
   const demo = params.get('demo');            // alerta de muestra en bucle (vista previa del panel)
   const demoPoll = params.get('demopoll') === '1';
   const mute = params.get('sonido') === '0' || Boolean(demo);
@@ -213,7 +252,7 @@
     reward: { title: 'Pepe_123', subtitle: 'canjeó Invocar zombie' },
     cheer: { title: 'Rico', subtitle: 'mandó 500 bits', detail: '¡Toma tus refuerzos!' },
     donation: { title: 'Luisa', subtitle: 'donó $50.00 MXN', detail: '¡Saludos desde León!' },
-    command: { title: 'Ana', subtitle: 'usó !lluvia' },
+    command: { title: 'Ana', subtitle: 'usó !zombis', target: 'ManyGamer123' },
     poll: { title: 'El chat decidió', subtitle: 'Creeper sorpresa' },
     chaos: { title: 'Modo caos', subtitle: '!salto' }
   };
@@ -260,6 +299,11 @@
 
     document.getElementById('alerts').className = `layer pos-${c.position}`;
     document.getElementById('poll').className = `layer pos-${c.pollPosition}`;
+    document.getElementById('status').className = `layer pos-${c.statusPosition}`;
+    document.getElementById('top').className = `layer pos-${c.topPosition}`;
+    root.setProperty('--status-scale', c.statusScale);
+    root.setProperty('--top-scale', c.topScale);
+    renderExtras();
 
     if (demo && current) renderAlert(current.data, current.ms, true); // refrescar la muestra con el estilo nuevo
     if (demoPoll) renderPoll(SAMPLE_POLL, false);
@@ -322,6 +366,7 @@
         ${a.title ? `<div class="title">${esc(a.title)}</div>` : ''}
         ${a.subtitle ? `<div class="subtitle">${esc(a.subtitle)}</div>` : ''}
         ${a.detail ? `<div class="detail">“${esc(a.detail)}”</div>` : ''}
+        ${a.target && config.showTarget ? `<div class="target">🎯 ${a.target === 'todos' ? 'para todos' : esc(a.target)}</div>` : ''}
       </div>
       <div class="timer" style="animation-duration:${ms}ms"></div>`;
     box.replaceChildren(el);
@@ -438,6 +483,69 @@
       setInterval(pollTick, 1000);
     }
   }
+
+  // ---------- Contadores (reglas del mundo temporales, modo caos) y top del directo ----------
+  const statusBox = document.getElementById('statusBox');
+  const topBox = document.getElementById('topBox');
+  let extras = { timers: [], top: [] };
+  const shown = new Set(); // para animar solo las tarjetas nuevas
+  const now0 = Date.now();
+  const DEMO_EXTRAS = {
+    timers: [
+      { id: 'caos', kind: 'chaos', icon: '🌀', label: 'Modo caos', since: new Date(now0 - 200e3).toISOString(), endsAt: new Date(now0 + 400e3).toISOString() },
+      { id: 'natural_health_regeneration', kind: 'gamerule', icon: '⏱', label: 'Regenerar vida con la comida', value: 'desactivado', since: new Date(now0 - 60e3).toISOString(), endsAt: new Date(now0 + 240e3).toISOString() }
+    ],
+    top: [{ user: 'Carla', bits: 1500, money: {} }, { user: 'Dani', bits: 0, money: { MXN: 100 } }, { user: 'Rico', bits: 500, money: {} }]
+  };
+  const clock = (ms) => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+  const amountText = (v) => [v.bits ? `${v.bits.toLocaleString('es-MX')} bits` : '',
+    ...Object.entries(v.money || {}).map(([cur, n]) => `$${Number(n).toLocaleString('es-MX', { maximumFractionDigits: 2 })} ${cur}`)].filter(Boolean).join(' · ');
+
+  function renderExtras() {
+    if (!config) return;
+    const data = demoExtras ? DEMO_EXTRAS : extras;
+    // Contadores
+    if (showStatusWidget && config.statusEnabled) {
+      const ids = new Set(data.timers.map((t) => t.id));
+      statusBox.innerHTML = data.timers.map((t) => {
+        const accent = t.kind === 'chaos' ? config.colors.chaos : config.colors.command;
+        const left = t.endsAt ? Date.parse(t.endsAt) - Date.now() : null;
+        const total = t.endsAt && t.since ? Date.parse(t.endsAt) - Date.parse(t.since) : null;
+        const pct = left !== null && total ? Math.max(0, Math.min(100, (left / total) * 100)) : null;
+        const fresh = !shown.has(t.id);
+        return `<div class="tcard ${fresh ? 'enter' : ''}" style="--accent:${accent};--glow:${rgba(accent, 0.35)}">
+          <div class="tcard-row">
+            <span class="tcard-icon">${t.icon}</span>
+            <div class="tcard-text">
+              <div class="tcard-label">${esc(t.label)}</div>
+              ${t.value ? `<div class="tcard-sub">${esc(t.value)}</div>` : t.kind === 'chaos' && !t.endsAt ? '<div class="tcard-sub">activo</div>' : ''}
+            </div>
+            ${left !== null ? `<span class="tcard-time ${left < 10000 ? 'ending' : ''}">${clock(left)}</span>` : ''}
+          </div>
+          ${pct !== null ? `<div class="tcard-bar"><span style="width:${pct}%"></span></div>` : ''}
+        </div>`;
+      }).join('');
+      shown.clear(); ids.forEach((id) => shown.add(id));
+    } else statusBox.innerHTML = '';
+    // Top del directo
+    if (showTopWidget && config.topEnabled && data.top.length) {
+      const accent = config.colors.cheer;
+      const medals = ['🥇', '🥈', '🥉', '4', '5'];
+      topBox.innerHTML = `<div class="topcard" style="--accent:${accent};--glow:${rgba(accent, 0.35)}">
+        <div class="top-title">${esc(config.topTitle)}</div>
+        ${data.top.slice(0, config.topCount).map((v, i) => `<div class="top-row"><span class="top-medal">${medals[i]}</span>
+          <span class="top-name">${esc(v.user)}</span><span class="top-amount">${esc(amountText(v))}</span></div>`).join('')}
+      </div>`;
+    } else topBox.innerHTML = '';
+  }
+
+  async function extrasTick() {
+    if (!demoExtras) {
+      try { extras = await fetch('/api/overlay/estado').then((r) => r.json()); } catch { extras = { timers: [], top: [] }; }
+    }
+    renderExtras();
+  }
+  if (showStatusWidget || showTopWidget) { extrasTick(); setInterval(extrasTick, 1000); }
 
   loadConfig();
 })();

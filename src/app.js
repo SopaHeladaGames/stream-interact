@@ -137,11 +137,13 @@ export async function startApp(options = {}) {
 
   // Alerta automática en el overlay cada vez que se ejecuta una regla
   // (salvo que la regla tenga su propia acción "overlay")
-  engine.onRuleRun((rule, event, label) => {
+  engine.onRuleRun((rule, event, label, target) => {
     if (!gameStore.overlay.autoAlerts) return;
     if ((rule.actions ?? []).some((a) => a.type === 'overlay')) return;
     if (alwaysAlerts(event)) return; // ya se mostró al llegar
-    overlayFeed.alert({ ...autoAlert(event, label), platform: event.platform });
+    // "A quién le tocó" cuando la regla (o el modo caos) eligió a alguien
+    const extra = target && gameStore.overlay.showTarget ? { target } : {};
+    overlayFeed.alert({ ...autoAlert(event, label), ...extra, platform: event.platform });
   });
 
   const simulate = ({ type = 'reward', name = '', user = 'Tester', amount = 0, input = '', currency = '' }) =>
@@ -163,6 +165,29 @@ export async function startApp(options = {}) {
   registerOverlayRoutes(app, { gameStore });
   registerDonationRoutes(app, { donations });
   registerStatsRoutes(app, { history });
+  // Overlay: contadores (reglas del mundo temporales y modo caos) y top del directo
+  app.get('/api/overlay/estado', (_req, res) => {
+    const timers = [];
+    const c = chaos.status();
+    if (c.running) timers.push({ id: 'caos', kind: 'chaos', icon: '🌀', label: 'Modo caos', since: c.autoStartAt, endsAt: c.autoStopAt });
+    for (const t of gamerules.temporaries()) {
+      if (t.otherInstallation) continue;
+      const v = typeof t.value === 'boolean' ? (t.value ? 'activado' : 'desactivado') : t.value;
+      timers.push({ id: t.id, kind: 'gamerule', icon: '⏱', label: t.label, value: v, since: t.since ? new Date(t.since).toISOString() : null, endsAt: new Date(t.until).toISOString() });
+    }
+    // Top del directo: bits y donaciones (convertidas a bits para ordenarlas)
+    const rates = engine.settings.bitsPerCurrency ?? {};
+    const s = history.stats({ range: 'session' });
+    const top = s.topViewers
+      .map((v) => {
+        const moneyBits = Object.entries(v.money).reduce((n, [cur, amt]) => n + amt * (Number(rates[cur]) || 0), 0);
+        return { user: v.user, bits: v.bits, money: v.money, score: v.bits + moneyBits };
+      })
+      .filter((v) => v.bits > 0 || Object.keys(v.money).length)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+    res.json({ timers, top });
+  });
   registerRedemptionRoutes(app, { redemptions, getTwitch: () => twitch });
   // Versión y actualizaciones (las maneja la app de escritorio; sin ella solo se informa la versión)
   app.get('/api/app/version', (_req, res) => res.json(options.updates?.status() ?? { current: process.env.npm_package_version ?? null, packaged: false, state: 'dev' }));
