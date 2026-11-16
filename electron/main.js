@@ -118,6 +118,7 @@ async function checkForUpdates(manual = false) {
   if (update.state === 'downloading' || update.state === 'ready') return update;
   try { await autoUpdater.checkForUpdates(); } catch (err) { Object.assign(update, { state: 'error', error: err.message }); }
   if (manual && update.state === 'none') notify('Todo al día', `Tienes la versión más reciente (${app.getVersion()}).`);
+  if (manual && update.state === 'error') notify('No se pudo buscar la actualización', String(update.error).split('\n')[0].slice(0, 180));
   return update;
 }
 

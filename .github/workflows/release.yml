@@ -40,7 +40,17 @@ jobs:
       - name: Compilar panel
         run: npm run panel:build
 
-      - name: Crear instalador y publicar
-        run: npx electron-builder --win nsis --publish always
+      # Se compila sin publicar y luego se crea UNA sola Release con todos los archivos
+      # (si electron-builder publica solo, a veces crea dos Releases con el mismo tag y la app no encuentra latest.yml)
+      - name: Crear instalador
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Publicar en GitHub Releases
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            dist-instalador/*.exe dist-instalador/*.exe.blockmap dist-instalador/latest.yml \
+            --title "$VERSION" --notes "Versión $VERSION. La app instalada se actualiza sola."

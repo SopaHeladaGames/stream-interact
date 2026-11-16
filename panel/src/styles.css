@@ -483,7 +483,8 @@ select.invalid { border-color: var(--error); color: var(--error); }
 .session-btn:hover, .session-btn.active { border-color: var(--accent-2); }
 
 /* --- Versión y actualizaciones --- */
-.app-version { margin-top: 10px; text-align: center; display: flex; gap: 6px; justify-content: center; align-items: center; }
+.app-version { margin-top: 10px; text-align: center; display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.update-note { flex-basis: 100%; font-size: 11.5px; color: var(--text); line-height: 1.35; cursor: pointer; }
 .link-btn { all: unset; cursor: pointer; color: var(--accent); font-size: 12px; }
 .link-btn:disabled { opacity: .5; cursor: default; }
 .update-box { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 10px; border: 1px solid var(--accent-2); background: rgba(124, 77, 255, .12); font-size: 13px; }

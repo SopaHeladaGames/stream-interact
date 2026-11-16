@@ -5,6 +5,7 @@ import { api } from '../api.js';
 export default function UpdateBadge() {
   const [info, setInfo] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(null);
 
   useEffect(() => {
     const load = () => api.version().then(setInfo).catch(() => {});
@@ -20,7 +21,18 @@ export default function UpdateBadge() {
     setBusy(true);
     try { await api.actualizar(); } catch (e) { alert(e.message); setBusy(false); }
   };
-  const check = async () => { setBusy(true); try { setInfo({ ...info, ...(await api.buscarActualizacion()) }); } finally { setBusy(false); } };
+  // Al buscar a mano se dice qué pasó (antes no se veía nada si había un error)
+  const check = async () => {
+    setBusy(true); setNote(null);
+    try {
+      const res = await api.buscarActualizacion();
+      const next = { ...info, state: res.state, newVersion: res.version ?? res.newVersion, progress: res.progress, error: res.error };
+      setInfo(next);
+      setNote(res.state === 'none' ? 'Ya tienes la última versión.'
+        : res.state === 'downloading' || res.state === 'ready' ? `Hay una versión nueva: ${next.newVersion}.`
+          : res.state === 'error' ? `No se pudo buscar: ${String(res.error ?? '').split('\n')[0].slice(0, 140)}` : null);
+    } catch (e) { setNote(e.message); } finally { setBusy(false); }
+  };
 
   if (info.state === 'ready') {
     return (
@@ -39,6 +51,7 @@ export default function UpdateBadge() {
           {busy || info.state === 'checking' ? 'buscando…' : 'buscar'}
         </button>
       )}
+      {note && <div className="update-note" onClick={() => setNote(null)}>{note}</div>}
     </div>
   );
 }
