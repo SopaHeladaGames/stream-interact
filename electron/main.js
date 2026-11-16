@@ -18,7 +18,10 @@ const { autoUpdater } = updaterPkg;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = path.join(ROOT, 'electron', 'assets');
 const DEV = process.argv.includes('--dev');
-const APP_NAME = 'stream-interact';
+// Nombre que ves (ventana, bandeja, notificaciones) y nombre interno (carpeta de ajustes en AppData:
+// se queda igual para no perder dónde están tus datos)
+const APP_NAME = 'Sopa-ChatBot';
+const INTERNAL_NAME = 'stream-interact';
 
 const HIDDEN = process.argv.includes('--oculto'); // al arrancar con Windows: directo a la bandeja
 
@@ -26,8 +29,13 @@ const HIDDEN = process.argv.includes('--oculto'); // al arrancar con Windows: di
 process.env.STREAM_INTERACT_ROOT = ROOT;
 // Tus datos: en desarrollo, la carpeta del proyecto; instalada, la que elijas (se decide en boot)
 let DATA_DIR = ROOT;
-app.setName(APP_NAME);
-if (process.platform === 'win32') app.setAppUserModelId('com.sopahelada.streaminteract');
+app.setName(INTERNAL_NAME);
+// Identidad de la app para Windows (notificaciones). La versión de desarrollo usa otra, para que Windows
+// no confunda las dos: si comparten identidad, al dar clic a una notificación puede abrir el electron.exe
+// de node_modules (la pantalla de bienvenida de Electron) en vez de stream-interact.
+if (process.platform === 'win32') {
+  app.setAppUserModelId(app.isPackaged ? 'com.sopahelada.streaminteract' : 'com.sopahelada.streaminteract.dev');
+}
 
 // Solo una instancia: si la abres otra vez, se enfoca la ventana existente
 if (!app.requestSingleInstanceLock()) {
@@ -49,6 +57,7 @@ let lastMenuSignature = null;
 async function boot() {
   Menu.setApplicationMenu(null);
   if (app.isPackaged) {
+    refreshAutostart();
     DATA_DIR = await resolveDataDir();
     if (!DATA_DIR) { app.exit(0); return; }
   }
@@ -68,7 +77,7 @@ async function boot() {
       updates: { status: () => ({ current: app.getVersion(), packaged: app.isPackaged, state: update.state, newVersion: update.version, progress: update.progress, error: update.error }), install: installUpdate, check: () => checkForUpdates(true) }
     });
   } catch (err) {
-    dialog.showErrorBox('No se pudo iniciar stream-interact', `${err.message}\n\nRevisa tu archivo .env en:\n${DATA_DIR}`);
+    dialog.showErrorBox(`No se pudo iniciar ${APP_NAME}`, `${err.message}\n\nRevisa tu archivo .env en:\n${DATA_DIR}`);
     if (app.isPackaged) shell.openPath(DATA_DIR);
     app.exit(1);
     return;
@@ -139,12 +148,25 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 600,
     title: APP_NAME,
-    icon: path.join(ASSETS, 'icon.png'),
+    icon: path.join(ASSETS, process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     backgroundColor: '#0e0e12',
     autoHideMenuBar: true,
     show: false,
     webPreferences: { contextIsolation: true, sandbox: true }
   });
+
+  // Ícono de la barra de tareas: sin esto, en desarrollo (y a veces al fijar la app) Windows
+  // muestra el ícono de Electron. El .ico tiene que ser un archivo real (fuera del .asar).
+  if (process.platform === 'win32') {
+    const ico = app.isPackaged ? path.join(process.resourcesPath, 'icon.ico') : path.join(ASSETS, 'icon.ico');
+    try {
+      win.setAppDetails({
+        appId: app.isPackaged ? 'com.sopahelada.streaminteract' : 'com.sopahelada.streaminteract.dev',
+        appIconPath: ico, appIconIndex: 0,
+        ...(app.isPackaged ? { relaunchCommand: `"${process.execPath}"`, relaunchDisplayName: APP_NAME } : {})
+      });
+    } catch { /* no es grave */ }
+  }
 
   const appUrl = DEV ? 'http://localhost:5173' : backend.url;
   win.loadURL(appUrl);
@@ -161,6 +183,7 @@ function createWindow() {
       win.webContents.toggleDevTools();
     }
   });
+  win.on('page-title-updated', (e) => e.preventDefault()); // siempre "Sopa-ChatBot"
   win.once('ready-to-show', () => { if (!HIDDEN) win.show(); });
 
   // Lo que no es el panel (login de Twitch, enlaces externos) se abre en tu navegador normal
@@ -248,7 +271,7 @@ function refreshTray() {
     ...(app.isPackaged ? [
       {
         label: 'Iniciar con Windows', type: 'checkbox', checked: startup,
-        click: (item) => { app.setLoginItemSettings({ openAtLogin: item.checked, args: ['--oculto'] }); lastMenuSignature = null; refreshTray(); }
+        click: (item) => { setAutostart(item.checked); lastMenuSignature = null; refreshTray(); }
       },
       { label: 'Cambiar carpeta de datos…', click: changeDataDir },
       { label: `Buscar actualizaciones (versión ${app.getVersion()})`, click: () => checkForUpdates(true) }
@@ -289,10 +312,10 @@ async function resolveDataDir() {
   while (true) {
     const { response } = await dialog.showMessageBox({
       type: 'question',
-      title: 'stream-interact',
+      title: APP_NAME,
       message: '¿Dónde guardo tu configuración?',
       detail: 'Aquí van tu .env, las reglas, el historial y la sesión de Twitch.\n\n' +
-        'Si ya usabas stream-interact desde una carpeta (por ejemplo C:\\Users\\…\\dev\\stream-interact), ' +
+        'Si ya usabas la app desde una carpeta (por ejemplo C:\\Users\\…\\dev\\stream-interact), ' +
         'elígela y la app usará exactamente la misma configuración.',
       buttons: ['Usar una carpeta existente…', 'Crear una nueva', 'Salir'],
       defaultId: 0, cancelId: 2, noLink: true
@@ -328,6 +351,21 @@ async function resolveDataDir() {
   }
 }
 
+// "Iniciar con Windows" guarda la ruta del programa; si una actualización cambia el nombre del .exe,
+// se vuelve a registrar al abrir para que siga funcionando.
+const PREFS_FILE = () => path.join(app.getPath('userData'), 'preferencias.json');
+function readPrefs() { try { return JSON.parse(fs.readFileSync(PREFS_FILE(), 'utf8')); } catch { return {}; } }
+function setAutostart(on) {
+  app.setLoginItemSettings({ openAtLogin: on, args: ['--oculto'] });
+  try { fs.writeFileSync(PREFS_FILE(), JSON.stringify({ ...readPrefs(), autostart: on }, null, 2)); } catch { /* no es grave */ }
+}
+function refreshAutostart() {
+  if (!app.isPackaged) return;
+  const prefs = readPrefs();
+  const on = prefs.autostart ?? app.getLoginItemSettings().openAtLogin;
+  if (on) setAutostart(true);
+}
+
 function saveDataDir(dir) {
   fs.mkdirSync(path.dirname(LOCATION_FILE()), { recursive: true });
   fs.writeFileSync(LOCATION_FILE(), JSON.stringify({ dataDir: dir }, null, 2));
@@ -348,7 +386,10 @@ async function changeDataDir() {
 // ---------- Utilidades ----------
 
 function notify(title, body) {
-  if (Notification.isSupported()) new Notification({ title, body, icon: path.join(ASSETS, 'icon.png'), silent: true }).show();
+  if (!Notification.isSupported()) return;
+  const n = new Notification({ title, body, icon: path.join(ASSETS, 'icon.png'), silent: true });
+  n.on('click', showWindow); // clic en la notificación → abrir el panel
+  n.show();
 }
 
 async function safe(fn) {

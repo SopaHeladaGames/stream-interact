@@ -102,7 +102,7 @@ export default function App() {
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-dot" />
-          stream-interact
+          Sopa-ChatBot
         </div>
         <nav>
           {PAGES.map((p) => (

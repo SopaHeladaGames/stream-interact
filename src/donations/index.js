@@ -66,7 +66,7 @@ export class DonationManager {
   startWebhookServer() {
     const app = express();
     app.disable('x-powered-by');
-    app.get('/', (_req, res) => res.type('text').send('stream-interact: webhooks OK'));
+    app.get('/', (_req, res) => res.type('text').send('Sopa-ChatBot: webhooks OK'));
     app.post('/webhooks/kofi', express.urlencoded({ extended: false, limit: '100kb' }), (req, res) => {
       const code = this.services.kofi.handleWebhook(req.body);
       res.sendStatus(code);

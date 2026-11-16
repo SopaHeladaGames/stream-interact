@@ -1,6 +1,6 @@
 {
   "name": "stream-interact",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Permite que el chat de tus directos (Twitch, luego Kick/YouTube) interactúe con tu juego.",
   "type": "module",
   "main": "electron/main.js",
@@ -36,7 +36,7 @@
   "author": "SopaHeladaGames",
   "build": {
     "appId": "com.sopahelada.streaminteract",
-    "productName": "stream-interact",
+    "productName": "Sopa-ChatBot",
     "copyright": "SopaHeladaGames",
     "directories": {
       "output": "dist-instalador"
@@ -52,7 +52,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "electron/assets/icon.png"
+      "icon": "electron/assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -60,10 +60,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "stream-interact",
+      "shortcutName": "Sopa-ChatBot",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
-      "artifactName": "stream-interact-instalador-${version}.${ext}"
+      "artifactName": "Sopa-ChatBot-instalador-${version}.${ext}"
     },
     "publish": [
       {
@@ -71,6 +71,12 @@
         "owner": "SopaHeladaGames",
         "repo": "stream-interact",
         "releaseType": "release"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "electron/assets/icon.ico",
+        "to": "icon.ico"
       }
     ]
   },

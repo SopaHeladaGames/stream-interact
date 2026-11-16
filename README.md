@@ -1,4 +1,6 @@
-# stream-interact
+# Sopa-ChatBot
+
+*(el repositorio y la carpeta del proyecto se llaman `stream-interact`)*
 
 Permite que el chat de tus directos interactúe con tu juego. Primera versión: **Twitch → Minecraft (Java)**.
 
@@ -372,7 +374,7 @@ npm install        # la primera vez (agrega electron-builder)
 npm run dist       # compila el panel y crea el instalador
 ```
 
-El instalador queda en `dist-instalador\stream-interact-instalador-<versión>.exe`. Al abrirlo, Windows puede mostrar "Windows protegió tu PC" porque la app no está firmada: **Más información → Ejecutar de todas formas**.
+El instalador queda en `dist-instalador\Sopa-ChatBot-instalador-<versión>.exe`. Al abrirlo, Windows puede mostrar "Windows protegió tu PC" porque la app no está firmada: **Más información → Ejecutar de todas formas**.
 
 - Se instala para tu usuario, con acceso directo en el escritorio y en el menú Inicio.
 - **La primera vez pregunta dónde están tus datos** (`.env`, `config/`, `data/`, `media/`). Elige tu carpeta del proyecto (por ejemplo `C:\Users\vitro\dev\stream-interact`) para usar la misma configuración, reglas, historial y sesión de Twitch que en desarrollo. O crea una nueva en Documentos.

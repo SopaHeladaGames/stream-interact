@@ -244,5 +244,5 @@ export class InstallationStore {
 
 export function acceptEula(dir) {
   fs.writeFileSync(path.join(dir, 'eula.txt'),
-    '# Aceptado desde stream-interact: https://aka.ms/MinecraftEULA\neula=true\n');
+    '# Aceptado desde Sopa-ChatBot: https://aka.ms/MinecraftEULA\neula=true\n');
 }

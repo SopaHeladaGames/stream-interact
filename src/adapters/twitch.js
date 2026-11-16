@@ -9,7 +9,7 @@ import { chatFeed } from '../core/chatFeed.js';
  * Adaptador de Twitch: escucha EventSub por WebSocket (no necesita URL pública)
  * y convierte cada evento al formato común del EventBus.
  */
-export async function startTwitch({ authProvider, userId, bus }) {
+export async function startTwitch({ authProvider, userId, bus, redemptions = null }) {
   const apiClient = new ApiClient({ authProvider });
   const me = await apiClient.users.getUserById(userId);
   log.info(`🟣 Conectado a Twitch como ${me.displayName}`);
@@ -38,6 +38,11 @@ export async function startTwitch({ authProvider, userId, bus }) {
       user: { id: e.userId, name: e.userName, displayName: e.userDisplayName }
     });
     const canManage = manageable.has(e.rewardId) && e.status === 'unfulfilled';
+    // Pestaña "Canjes" del chat: queda pendiente hasta que una regla (o tú) lo complete o lo devuelva
+    redemptions?.add({
+      id: e.id, rewardId: e.rewardId, title: e.rewardTitle, cost: e.rewardCost, input: e.input ?? '',
+      user: e.userDisplayName, managed: canManage, status: e.status === 'unfulfilled' ? 'pendiente' : 'hecho'
+    });
     bus.emit({
       platform: 'twitch',
       type: 'reward',
@@ -45,8 +50,11 @@ export async function startTwitch({ authProvider, userId, bus }) {
       user: { id: e.userId, name: e.userName, displayName: e.userDisplayName, isMod: false, isBroadcaster: e.userId === userId },
       amount: e.rewardCost,
       input: e.input ?? '',
-      complete: canManage ? () => e.updateStatus('FULFILLED') : undefined,
-      refund: canManage ? () => e.updateStatus('CANCELED') : undefined
+      // Recompensas creadas en Twitch: no se pueden completar por la API, pero si una regla las ejecutó se marcan como hechas aquí
+      complete: canManage
+        ? () => e.updateStatus('FULFILLED').then((r) => { redemptions?.set(e.id, 'hecho', { by: 'regla' }); return r; })
+        : async () => { redemptions?.set(e.id, 'hecho', { by: 'regla' }); },
+      refund: canManage ? () => e.updateStatus('CANCELED').then((r) => { redemptions?.set(e.id, 'devuelto', { by: 'regla' }); return r; }) : undefined
     });
   });
 
@@ -124,8 +132,41 @@ export async function startTwitch({ authProvider, userId, bus }) {
     try { return await fn(); } catch (err) { throw moderationError(err); }
   };
 
+  // Al conectar: traer los canjes de las recompensas de la app que siguen pendientes en Twitch
+  if (redemptions) {
+    (async () => {
+      for (const rewardId of manageable) {
+        try {
+          const page = await apiClient.channelPoints.getRedemptionsForBroadcaster(userId, rewardId, 'UNFULFILLED', { newestFirst: true, limit: 50 });
+          for (const r of page.data) {
+            redemptions.add({
+              id: r.id, rewardId: r.rewardId, title: r.rewardTitle, cost: r.rewardCost, input: r.userInput ?? '',
+              user: r.userDisplayName, managed: true, at: r.redemptionDate.toISOString()
+            });
+          }
+        } catch { /* recompensa borrada o sin permiso: se ignora */ }
+      }
+    })();
+  }
+
   return {
     displayName: me.displayName,
+    /** Completa o devuelve un canje pendiente desde el panel (solo recompensas de la app). */
+    resolveRedemption: async (id, action) => {
+      const item = redemptions?.get(id);
+      if (!item) throw Object.assign(new Error('Ese canje ya no está en la lista'), { status: 404 });
+      if (action === 'visto') return redemptions.set(id, 'hecho', { by: 'panel' });
+      if (!item.managed) {
+        throw Object.assign(new Error('Esta recompensa se creó en el panel de Twitch: solo se puede devolver desde Twitch. Puedes marcarla como hecha aquí.'), { status: 403 });
+      }
+      try {
+        await apiClient.channelPoints.updateRedemptionStatusByIds(userId, item.rewardId, [id], action === 'devolver' ? 'CANCELED' : 'FULFILLED');
+      } catch (err) {
+        // Si ya se resolvió en Twitch, solo se actualiza la lista
+        if (!/not found|already|404|400/i.test(err.message)) throw friendlyError(err);
+      }
+      return redemptions.set(id, action === 'devolver' ? 'devuelto' : 'hecho', { by: 'panel' });
+    },
     sendChat: (text) => apiClient.chat.sendChatMessage(userId, text).catch((err) =>
       log.warn('No se pudo enviar mensaje al chat:', err.message)),
     /** Escribir en el chat desde el panel (con respuesta opcional a otro mensaje). */
@@ -136,8 +177,8 @@ export async function startTwitch({ authProvider, userId, bus }) {
       }
     }),
     deleteMessage: (messageId) => moderate(() => apiClient.moderation.deleteChatMessages(userId, messageId)),
-    timeout: (targetId, seconds, reason) => moderate(() => apiClient.moderation.banUser(userId, { user: targetId, duration: seconds, reason: reason || 'Timeout desde stream-interact' })),
-    ban: (targetId, reason) => moderate(() => apiClient.moderation.banUser(userId, { user: targetId, reason: reason || 'Ban desde stream-interact' })),
+    timeout: (targetId, seconds, reason) => moderate(() => apiClient.moderation.banUser(userId, { user: targetId, duration: seconds, reason: reason || 'Timeout desde Sopa-ChatBot' })),
+    ban: (targetId, reason) => moderate(() => apiClient.moderation.banUser(userId, { user: targetId, reason: reason || 'Ban desde Sopa-ChatBot' })),
     unban: (targetId) => moderate(() => apiClient.moderation.unbanUser(userId, targetId)),
     /** Crea una recompensa propiedad de esta app (así se puede completar/reembolsar). */
     createReward: async (data) => {

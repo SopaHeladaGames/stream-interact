@@ -15,6 +15,7 @@ import { InstallationStore } from './installations.js';
 import { BackupManager } from './backups.js';
 import { GameruleManager } from './gamerules.js';
 import { HistoryStore } from './core/history.js';
+import { RedemptionQueue } from './core/redemptions.js';
 import { PlayerTargets } from './core/targets.js';
 import { parseList } from './minecraftPlayers.js';
 import { GameStore } from './game/gameStore.js';
@@ -23,7 +24,7 @@ import { ChaosMode } from './game/chaos.js';
 import { DonationManager } from './donations/index.js';
 import { chatFeed } from './core/chatFeed.js';
 import { formatMoney } from './core/money.js';
-import { createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, registerOverlayRoutes, registerDonationRoutes, registerStatsRoutes, servePanel } from './server.js';
+import { createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, registerOverlayRoutes, registerDonationRoutes, registerStatsRoutes, registerRedemptionRoutes, servePanel } from './server.js';
 
 /**
  * Arranca todo el backend: reglas, RCON, servidor HTTP + panel y Twitch.
@@ -91,6 +92,8 @@ export async function startApp(options = {}) {
   const history = new HistoryStore(path.resolve('data', 'historial'));
   engine.onRecord((rec) => history.record(rec));
   engine.countThisStream = (ruleId) => history.countThisStream(ruleId);
+  // Canjes de recompensas para la pestaña "Canjes" del chat
+  const redemptions = new RedemptionQueue(path.resolve('data', 'canjes.json'));
 
   // Votaciones y modo caos: avisan en el chat de Twitch y dentro de Minecraft
   const notify = {
@@ -160,6 +163,7 @@ export async function startApp(options = {}) {
   registerOverlayRoutes(app, { gameStore });
   registerDonationRoutes(app, { donations });
   registerStatsRoutes(app, { history });
+  registerRedemptionRoutes(app, { redemptions, getTwitch: () => twitch });
   // Versión y actualizaciones (las maneja la app de escritorio; sin ella solo se informa la versión)
   app.get('/api/app/version', (_req, res) => res.json(options.updates?.status() ?? { current: process.env.npm_package_version ?? null, packaged: false, state: 'dev' }));
   app.post('/api/app/buscar-actualizacion', async (_req, res) => res.json(options.updates ? await options.updates.check() : { state: 'dev' }));
@@ -195,7 +199,7 @@ export async function startApp(options = {}) {
   }
 
   const twitchReady = authPromise
-    .then(({ authProvider, userId }) => startTwitch({ authProvider, userId, bus }))
+    .then(({ authProvider, userId }) => startTwitch({ authProvider, userId, bus, redemptions }))
     .then((t) => {
       twitch = t;
       chatSenders.twitch = t.sendChat;

@@ -489,6 +489,32 @@ select.invalid { border-color: var(--error); color: var(--error); }
 .link-btn:disabled { opacity: .5; cursor: default; }
 .update-box { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 10px; border: 1px solid var(--accent-2); background: rgba(124, 77, 255, .12); font-size: 13px; }
 
+/* --- Pestañas del chat: recompensas y canjes --- */
+.chat-tabs { display: flex; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.chat-tabs button { all: unset; cursor: pointer; flex: 1; text-align: center; padding: 6px 4px; border-radius: 6px; font-size: 12.5px; color: var(--muted); display: inline-flex; gap: 6px; justify-content: center; align-items: center; }
+.chat-tabs button:hover { background: var(--panel-2); color: var(--text); }
+.chat-tabs button.active { background: var(--panel-2); color: var(--text); font-weight: 600; }
+.tab-count { background: var(--accent-2); color: white; border-radius: 10px; font-size: 10.5px; padding: 1px 6px; font-weight: 700; }
+.side-box { overflow-y: auto; }
+.side-list { display: flex; flex-direction: column; gap: 6px; padding: 10px; }
+.side-empty { padding: 20px 14px; color: var(--muted); text-align: center; font-size: 13px; }
+.side-empty.small { padding: 6px 4px 10px; font-size: 12px; text-align: left; }
+.side-section { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 6px 2px 2px; }
+.side-reward, .side-redemption { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); font-size: 13px; }
+.side-reward.off { opacity: .55; }
+.side-reward-color { width: 6px; align-self: stretch; border-radius: 3px; flex-shrink: 0; }
+.side-reward-main { flex: 1; min-width: 0; }
+.side-reward-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-reward-actions, .side-redemption-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.side-reward-actions .tool { all: unset; cursor: pointer; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; font-size: 12px; color: var(--muted); }
+.side-reward-actions .tool:hover:not(:disabled) { background: var(--panel); color: var(--text); }
+.side-reward-actions .tool:disabled { opacity: .35; cursor: default; }
+.side-reward-actions .tool.warn-on { color: var(--warn); }
+.pause-glyph { font-size: 8px; letter-spacing: -1px; }
+.side-redemption.pending { border: 1px solid rgba(155, 107, 255, .35); }
+.side-input { font-size: 12.5px; color: var(--text); background: var(--bg); border-radius: 6px; padding: 3px 7px; margin: 3px 0; overflow-wrap: anywhere; }
+.small-switch { transform: scale(.85); }
+
 /* --- Recompensas --- */
 .card.flush { padding: 0; overflow: hidden; }
 .table.rewards td { vertical-align: middle; }

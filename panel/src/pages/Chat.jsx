@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api, subscribeChat } from '../api.js';
+import { ChatRewardList, ChatRedemptions } from '../components/ChatRewards.jsx';
 
 const MAX_MESSAGES = 300;
 const FALLBACK_COLORS = ['#FF4A80', '#FF7F50', '#1E90FF', '#2E8B57', '#DAA520', '#9ACD32', '#00C7AC', '#B87CFF', '#FF69B4', '#5F9EA0'];
@@ -38,6 +39,8 @@ export default function ChatPanel({ conectado, canal, loginUrl, onClose, top }) 
   const [unseen, setUnseen] = useState(0);
   const [showEvents, setShowEvents] = useState(true);
   const [showTimes, setShowTimes] = useState(false);
+  const [tab, setTab] = useState('chat'); // chat | recompensas | canjes
+  const [pending, setPending] = useState(0);
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const pinnedRef = useRef(true);
@@ -103,6 +106,25 @@ export default function ChatPanel({ conectado, canal, loginUrl, onClose, top }) 
 
   const visible = entries.filter((e) => showEvents || e.kind !== 'event');
 
+  // Canjes pendientes (para el numerito de la pestaña, aunque no esté abierta)
+  useEffect(() => {
+    if (!conectado) return undefined;
+    const load = () => api.canjes().then((d) => setPending(d.pending.length)).catch(() => {});
+    load();
+    const id = setInterval(load, 10000);
+    return () => clearInterval(id);
+  }, [conectado]);
+
+  const tabs = (
+    <div className="chat-tabs">
+      <button className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
+      <button className={tab === 'recompensas' ? 'active' : ''} onClick={() => setTab('recompensas')}>Recompensas</button>
+      <button className={tab === 'canjes' ? 'active' : ''} onClick={() => setTab('canjes')}>
+        Canjes{pending > 0 && <span className="tab-count">{pending}</span>}
+      </button>
+    </div>
+  );
+
   const header = (
     <div className="chat-head">
       <div className="chat-head-title">
@@ -138,7 +160,14 @@ export default function ChatPanel({ conectado, canal, loginUrl, onClose, top }) 
     <div className="chat-page">
       {header}
       {top}
-      <div className="chat-box">
+      {tabs}
+      {tab !== 'chat' && (
+        <div className="chat-box side-box">
+          {tab === 'recompensas' ? <ChatRewardList flash={flash} /> : <ChatRedemptions flash={flash} onCount={setPending} />}
+          {toast && <div className={`chat-toast ${toast.type}`}>{toast.msg}</div>}
+        </div>
+      )}
+      <div className="chat-box" style={tab === 'chat' ? undefined : { display: 'none' }}>
         <div className="chat-list" ref={listRef} onScroll={onScroll}>
           {visible.length === 0 && <div className="empty">Aún no hay mensajes. Escribe algo en tu chat o aquí abajo.</div>}
           {visible.map((e) => {

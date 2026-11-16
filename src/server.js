@@ -323,6 +323,19 @@ export function registerDonationRoutes(app, { donations }) {
 }
 
 /** Control del servidor de Minecraft desde el panel. */
+/** Canjes de recompensas (pestaña "Canjes" del chat). */
+export function registerRedemptionRoutes(app, { redemptions, getTwitch }) {
+  app.get('/api/canjes', route(() => redemptions.list()));
+  app.post('/api/canjes/:id/:action', route(async (req) => {
+    const { id, action } = req.params;
+    if (!['completar', 'devolver', 'visto'].includes(action)) throw Object.assign(new Error('Acción desconocida'), { status: 400 });
+    const twitch = getTwitch();
+    if (action === 'visto') return redemptions.set(id, 'hecho', { by: 'panel' }) ?? {};
+    if (!twitch) throw Object.assign(new Error('Twitch no está conectado'), { status: 409 });
+    return twitch.resolveRedemption(id, action);
+  }));
+}
+
 /** Estadísticas de lo que hizo el chat. */
 export function registerStatsRoutes(app, { history }) {
   const opts = (q) => ({ range: q.range ?? 'session', from: q.from, to: q.to, tests: q.tests === '1' });
@@ -440,7 +453,7 @@ export function servePanel(app) {
   const dist = path.join(APP_ROOT, 'panel', 'dist');
   if (!fs.existsSync(path.join(dist, 'index.html'))) {
     app.get('/', (_req, res) => res.type('html').send(
-      '<h2>stream-interact</h2><p>El panel no está compilado. Ejecuta <code>npm run panel:build</code> ' +
+      '<h2>Sopa-ChatBot</h2><p>El panel no está compilado. Ejecuta <code>npm run panel:build</code> ' +
       'o, para desarrollo, <code>npm run panel:dev</code> y abre <a href="http://localhost:5173">localhost:5173</a>.</p>'));
     return;
   }
