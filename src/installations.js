@@ -78,8 +78,11 @@ export function detectInstallation(dir) {
 export function detectJavas() {
   if (process.platform !== 'win32') return [];
   const env = process.env;
-  const roots = [env.ProgramFiles, env['ProgramFiles(x86)']].filter(Boolean).flatMap((pf) =>
+  // Program Files (instalación para todos) y AppData\Local\Programs (instalación solo para el usuario)
+  const bases = [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, 'Programs')].filter(Boolean);
+  const roots = bases.flatMap((pf) =>
     ['Java', 'Eclipse Adoptium', 'Amazon Corretto', 'Microsoft', 'Zulu', 'BellSoft', 'Semeru', 'Temurin'].map((v) => path.join(pf, v)));
+  if (env.USERPROFILE) roots.push(path.join(env.USERPROFILE, '.jdks')); // los que descarga IntelliJ
   const found = [];
   for (const root of roots) {
     for (const name of list(root)) {
