@@ -6,6 +6,8 @@ import { log } from '../core/logger.js';
  * Conexión RCON al servidor de Minecraft. Se reconecta sola si el servidor se cae
  * o si arrancas la app antes que el servidor.
  */
+const UNKNOWN_COMMAND = /Unknown or incomplete command|Unknown command|Comando desconocido/i;
+
 export class MinecraftRcon {
   constructor({ host, port, password }) {
     this.options = { host, port, password, timeout: 3000 };
@@ -22,6 +24,7 @@ export class MinecraftRcon {
           rcon.on('end', () => { log.warn('Se cerró la conexión RCON'); this.rcon = null; });
           rcon.on('error', () => { this.rcon = null; });
           this.rcon = rcon;
+          this.namespaced = null; // puede ser otro servidor (Paper, NeoForge…): volver a averiguarlo
           return rcon;
         })
         .finally(() => { this.connecting = null; });
@@ -36,6 +39,21 @@ export class MinecraftRcon {
   async send(command) {
     const rcon = await this.#connection();
     return rcon.send(command);
+  }
+
+  /**
+   * Comando de vanilla (list, whitelist, kick…). En Paper se manda como "minecraft:list" para que
+   * ningún plugin cambie el formato de la respuesta; NeoForge, Fabric y vanilla no aceptan ese
+   * prefijo, así que si lo rechaza se manda sin él y se recuerda para esta conexión.
+   */
+  async vanilla(command) {
+    if (this.namespaced !== false) {
+      const response = await this.send(`minecraft:${command}`);
+      if (!UNKNOWN_COMMAND.test(response)) { this.namespaced = true; return response; }
+      if (this.namespaced === true) return response; // ya sabíamos que acepta el prefijo: el error es del comando
+      this.namespaced = false;
+    }
+    return this.send(command);
   }
 
   async tryConnect({ quiet = false } = {}) {

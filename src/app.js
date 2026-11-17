@@ -84,7 +84,7 @@ export async function startApp(options = {}) {
     online: async () => {
       if (!mc.connected) await mc.tryConnect({ quiet: true });
       if (!mc.connected) throw new Error('Sin RCON');
-      return parseList(await mc.send('minecraft:list')).players;
+      return parseList(await mc.vanilla('list')).players;
     }
   });
   const engine = new RulesEngine({ rulesPath, bus, context: { player: config.minecraft.player }, actions, targets });

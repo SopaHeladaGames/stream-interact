@@ -6,7 +6,8 @@ import { log } from './core/logger.js';
 /**
  * Jugadores, lista blanca y datos para conectarse desde la red local.
  * Todo pasa por RCON, así que funciona igual si el servidor lo arrancó la app o start.bat.
- * Se usan los comandos "minecraft:..." para obtener siempre el formato de respuesta de vanilla.
+ * Los comandos van por mc.vanilla(): en Paper con el prefijo "minecraft:" (formato de vanilla aunque
+ * haya plugins) y en NeoForge/Fabric sin él, porque ahí no existe.
  */
 const NAME = /^[A-Za-z0-9_]{3,16}$/; // nombres válidos de Minecraft Java (evita meter otros comandos)
 const httpError = (status, message) => Object.assign(new Error(message), { status });
@@ -103,22 +104,22 @@ export class PlayerManager {
 
   async players() {
     if (!this.mc.connected) return { connected: false, count: 0, max: null, players: [] };
-    return { connected: true, ...parseList(await this.mc.send('minecraft:list')) };
+    return { connected: true, ...parseList(await this.mc.vanilla('list')) };
   }
 
   async whitelist() {
     if (!this.mc.connected) return { connected: false, players: [], enabled: this.network().whitelistInFile };
-    const players = parseWhitelist(await this.mc.send('minecraft:whitelist list'));
+    const players = parseWhitelist(await this.mc.vanilla('whitelist list'));
     return { connected: true, players, enabled: this.network().whitelistInFile };
   }
 
   async whitelistAction(action, name) {
     this.#requireRcon();
     let command;
-    if (action === 'add' || action === 'remove') command = `minecraft:whitelist ${action} ${validName(name)}`;
-    else if (action === 'on' || action === 'off') command = `minecraft:whitelist ${action}`;
+    if (action === 'add' || action === 'remove') command = `whitelist ${action} ${validName(name)}`;
+    else if (action === 'on' || action === 'off') command = `whitelist ${action}`;
     else throw httpError(400, 'Acción desconocida');
-    const response = await this.mc.send(command);
+    const response = await this.mc.vanilla(command);
     log.action(`/${command}  →  ${response}`);
     // Para "on/off", el servidor guarda el cambio en server.properties; esperar un momento para leerlo bien
     if (action === 'on' || action === 'off') await new Promise((r) => setTimeout(r, 300));
@@ -131,8 +132,8 @@ export class PlayerManager {
   async kick(name, reason) {
     this.#requireRcon();
     const clean = String(reason ?? '').replace(/[^\p{L}\p{N} .,!?¡¿_-]/gu, '').slice(0, 80);
-    const command = `minecraft:kick ${validName(name)}${clean ? ` ${clean}` : ''}`;
-    const response = await this.mc.send(command);
+    const command = `kick ${validName(name)}${clean ? ` ${clean}` : ''}`;
+    const response = await this.mc.vanilla(command);
     log.action(`/${command}  →  ${response}`);
     return { response: translate(response) };
   }
