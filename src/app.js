@@ -14,6 +14,7 @@ import { startPlayit } from './playit.js';
 import { InstallationStore } from './installations.js';
 import { BackupManager } from './backups.js';
 import { PaperUpdater } from './paperUpdater.js';
+import { adaptCommand, gameVersionOfDir } from './mcCompat.js';
 import { GameruleManager } from './gamerules.js';
 import { HistoryStore } from './core/history.js';
 import { RedemptionQueue } from './core/redemptions.js';
@@ -53,6 +54,9 @@ export async function startApp(options = {}) {
     defaults: { java: config.mcServer.java, memoryMin: config.mcServer.memoryMin, memoryMax: config.mcServer.memoryMax, extraArgs: config.mcServer.extraArgs ?? '' }
   });
   if (installations.active) mcServer.setInstallation(installations.effective(installations.active));
+  // Los comandos se escriben para la versión actual de Minecraft; si el mundo activo es más viejo
+  // (ej. 1.21.1 con mods), se traducen al mandarlos
+  mc.adapt = (command) => adaptCommand(command, gameVersionOfDir(installations.active?.dir));
   // Respaldos del mundo de la instalación activa
   const backups = new BackupManager({
     file: path.resolve('config', 'respaldos.json'), mcServer, mc,

@@ -38,7 +38,8 @@ export class MinecraftRcon {
 
   async send(command) {
     const rcon = await this.#connection();
-    return rcon.send(command);
+    // Traduce la sintaxis si la instalación activa es una versión vieja de Minecraft (ver mcCompat.js)
+    return rcon.send(this.adapt ? this.adapt(command) : command);
   }
 
   /**
