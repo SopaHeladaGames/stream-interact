@@ -15,6 +15,7 @@ import { InstallationStore } from './installations.js';
 import { BackupManager } from './backups.js';
 import { PaperUpdater } from './paperUpdater.js';
 import { adaptCommand, gameVersionOfDir } from './mcCompat.js';
+import { ProfileStore } from './core/profiles.js';
 import { GameruleManager } from './gamerules.js';
 import { HistoryStore } from './core/history.js';
 import { RedemptionQueue } from './core/redemptions.js';
@@ -26,7 +27,7 @@ import { ChaosMode } from './game/chaos.js';
 import { DonationManager } from './donations/index.js';
 import { chatFeed } from './core/chatFeed.js';
 import { formatMoney } from './core/money.js';
-import { createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, registerOverlayRoutes, registerDonationRoutes, registerStatsRoutes, registerRedemptionRoutes, servePanel } from './server.js';
+import { route, createServer, registerApiRoutes, registerServerRoutes, registerGameRoutes, registerOverlayRoutes, registerDonationRoutes, registerStatsRoutes, registerRedemptionRoutes, servePanel } from './server.js';
 
 /**
  * Arranca todo el backend: reglas, RCON, servidor HTTP + panel y Twitch.
@@ -131,13 +132,14 @@ export async function startApp(options = {}) {
   // Donaciones y bits (dinero o apoyo real) siempre se ven en el overlay al llegar, tengan o no una regla.
   // Si su regla trae una acción "Alerta en overlay" propia, esa la reemplaza (para no mostrar dos).
   // Las simulaciones de la página Probar siguen el camino normal (alerta solo si hay regla).
-  const ALWAYS_ALERT = new Set(['donation', 'cheer']);
+  const ALWAYS_ALERT = new Set(['donation', 'cheer', 'sub', 'gift', 'raid']);
   const alwaysAlerts = (event) => ALWAYS_ALERT.has(event.type) && event.platform !== 'simulado';
   bus.onEvent((event) => {
     if (!alwaysAlerts(event) || !gameStore.overlay.autoAlerts) return;
+    if (event.giftIndex) return; // un regalo de 10 subs es una sola alerta
     const rule = engine.findRule(event);
     if ((rule?.actions ?? []).some((a) => a.type === 'overlay')) return;
-    overlayFeed.alert({ ...autoAlert(event, event.type === 'cheer' ? 'bits' : 'donación'), platform: event.platform });
+    overlayFeed.alert({ ...autoAlert(event, event.type), platform: event.platform });
   });
 
   // Alerta automática en el overlay cada vez que se ejecuta una regla
@@ -151,22 +153,42 @@ export async function startApp(options = {}) {
     overlayFeed.alert({ ...autoAlert(event, label), ...extra, platform: event.platform });
   });
 
-  const simulate = ({ type = 'reward', name = '', user = 'Tester', amount = 0, input = '', currency = '' }) =>
-    bus.emit({
-      platform: 'simulado', type, name, amount: Number(amount) || 0, input, currency,
+  const simulate = ({ type = 'reward', name = '', user = 'Tester', amount = 0, input = '', currency = '', tier = '1', resub = false }) => {
+    const base = {
+      platform: 'simulado', type, name: name || type, amount: Number(amount) || 0, input, currency,
       user: { id: `sim-${user}`, name: user, displayName: user, isMod: true, isBroadcaster: false }
-    });
+    };
+    if (type === 'sub') return bus.emit({ ...base, amount: Math.max(1, base.amount), months: Math.max(1, base.amount), tier: String(tier), resub: Boolean(resub) || base.amount > 1 });
+    if (type === 'gift') {
+      const total = Math.min(100, Math.max(1, base.amount));
+      for (let i = 0; i < total; i++) bus.emit({ ...base, amount: total, tier: String(tier), giftIndex: i });
+      return;
+    }
+    return bus.emit(base);
+  };
 
   let twitch = null;
+  // Perfiles de juego: qué reglas y recompensas están encendidas (uno activo a la vez)
+  const profiles = new ProfileStore(path.resolve('config', 'perfiles.json'), {
+    getTwitch: () => twitch, rulesStore: store, onRulesChanged: () => engine.load()
+  });
+  engine.getActiveProfile = () => profiles.active;
   registerApiRoutes(app, {
     bus, engine, store, simulate, mc, mcServer, getTwitch: () => twitch, config,
     getGame: () => ({
       poll: polls.summary(),
       chaos: chaos.summary(),
+      ...profiles.summary(),
       donations: Object.fromEntries(Object.entries(donations.status().services).map(([id, d]) => [id, d.state]))
     })
   });
   registerGameRoutes(app, { polls, chaos, gameStore });
+  app.get('/api/perfiles', route(() => profiles.list()));
+  app.post('/api/perfiles', route((req) => profiles.add(req.body?.name)));
+  app.delete('/api/perfiles/:id', route((req) => profiles.remove(req.params.id)));
+  app.post('/api/perfiles/activar', route((req) => profiles.activate(req.body?.id ?? null)));
+  app.put('/api/perfiles/recompensa', route((req) => profiles.assignReward(req.body?.rewardId, req.body?.profileId ?? null)));
+  app.put('/api/perfiles/:id', route((req) => profiles.rename(req.params.id, req.body?.name)));
   registerOverlayRoutes(app, { gameStore });
   registerDonationRoutes(app, { donations });
   registerStatsRoutes(app, { history });

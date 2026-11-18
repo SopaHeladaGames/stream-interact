@@ -4,8 +4,14 @@ export const TRIGGERS = {
   reward: { label: 'Recompensa', hint: 'Canje de puntos del canal' },
   command: { label: 'Comando', hint: 'Mensaje del chat que empieza con !' },
   cheer: { label: 'Bits', hint: 'Cheers con un mínimo de bits' },
-  donation: { label: 'Donación', hint: 'Streamlabs, StreamElements o Ko-fi, por monto' }
+  donation: { label: 'Donación', hint: 'Streamlabs, StreamElements o Ko-fi, por monto' },
+  sub: { label: 'Suscripción', hint: 'Sub nueva o resub de Twitch (por tier y meses)' },
+  gift: { label: 'Subs regaladas', hint: 'Se ejecuta una vez por cada sub regalada' },
+  raid: { label: 'Raid', hint: 'Otro canal llega con su comunidad (por viewers)' },
+  follow: { label: 'Follow', hint: 'Alguien nuevo sigue el canal' }
 };
+
+export const TIERS = { '': 'Cualquiera', 1: 'Tier 1 / Prime', 2: 'Tier 2', 3: 'Tier 3' };
 
 export const ACTIONS = {
   minecraft: { label: 'Comandos de Minecraft', defaults: { commands: [''], repeat: 1 } },
@@ -31,7 +37,7 @@ export const MC_COLORS = {
   dark_blue: '#0000aa', light_purple: '#ff55ff', dark_purple: '#aa00aa', gray: '#aaaaaa', dark_gray: '#555555', black: '#000000'
 };
 
-export const VARIABLES = ['{user}', '{target}', '{player}', '{input}', '{amount}', '{currency}', '{money}', '{platform}'];
+export const VARIABLES = ['{user}', '{target}', '{player}', '{input}', '{amount}', '{currency}', '{money}', '{platform}', '{months}', '{gifts}', '{viewers}', '{tier}'];
 
 export function describeTrigger(t = {}) {
   if (t.type === 'cheer') {
@@ -44,6 +50,22 @@ export function describeTrigger(t = {}) {
     if (t.minAmount && t.maxAmount) return `$${t.minAmount}–${t.maxAmount}${cur}`;
     return t.minAmount ? `$${t.minAmount}+${cur}` : `Cualquier donación${cur}`;
   }
+  if (t.type === 'sub') {
+    const kind = t.resub === 'new' ? 'Sub nueva' : t.resub === 'resub' ? 'Resub' : 'Sub o resub';
+    const tier = t.tier ? ` · Tier ${t.tier}` : '';
+    const months = t.minAmount && t.maxAmount ? ` · ${t.minAmount}–${t.maxAmount} meses` : t.minAmount ? ` · ${t.minAmount}+ meses` : '';
+    return `${kind}${tier}${months}`;
+  }
+  if (t.type === 'gift') {
+    const tier = t.tier ? ` · Tier ${t.tier}` : '';
+    if (t.minAmount && t.maxAmount) return `Regalos de ${t.minAmount}–${t.maxAmount} subs${tier}`;
+    return t.minAmount ? `Regalos de ${t.minAmount}+ subs${tier}` : `Cualquier sub regalada${tier}`;
+  }
+  if (t.type === 'raid') {
+    if (t.minAmount && t.maxAmount) return `Raid de ${t.minAmount}–${t.maxAmount} viewers`;
+    return t.minAmount ? `Raid de ${t.minAmount}+ viewers` : 'Cualquier raid';
+  }
+  if (t.type === 'follow') return 'Follow nuevo';
   return t.name || '(sin nombre)';
 }
 
@@ -63,6 +85,10 @@ export function simulatedEventFor(rule, user = 'Tester') {
   const t = rule.trigger ?? {};
   if (t.type === 'cheer') return { type: 'cheer', name: 'bits', user, amount: t.minAmount || 100 };
   if (t.type === 'donation') return { type: 'donation', name: 'donation', user, amount: t.minAmount || 50, currency: t.currency || 'MXN' };
+  if (t.type === 'sub') return { type: 'sub', name: 'sub', user, amount: t.resub === 'new' ? 1 : (t.minAmount || (t.resub === 'resub' ? 6 : 1)), tier: t.tier || '1', resub: t.resub === 'resub' };
+  if (t.type === 'gift') return { type: 'gift', name: 'gift', user, amount: t.minAmount || 1, tier: t.tier || '1' };
+  if (t.type === 'raid') return { type: 'raid', name: 'raid', user, amount: t.minAmount || 10 };
+  if (t.type === 'follow') return { type: 'follow', name: 'follow', user, amount: 0 };
   return { type: t.type, name: t.name, user, amount: 0, input: '' };
 }
 

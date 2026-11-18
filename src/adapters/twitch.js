@@ -120,7 +120,58 @@ export async function startTwitch({ authProvider, userId, bus, redemptions = nul
     });
   });
 
-  // 4) Moderación hecha en Twitch (o desde la app): reflejarla en el panel
+  // 4) Suscripciones, subs regaladas, raids y follows
+  const TIER = { 1000: '1', 2000: '2', 3000: '3' };
+  const viewer = (id, name, displayName) => ({ id: id ?? 'anonimo', name: name ?? 'anonimo', displayName: displayName ?? 'Anónimo', isMod: false, isBroadcaster: false });
+  const safely = (label, fn) => { try { fn(); } catch (err) { log.warn(`No se pudo escuchar ${label} de Twitch: ${err.message}`); } };
+
+  // Suscripción nueva (las que son regalo se cuentan en "subs regaladas", para no contarlas dos veces)
+  safely('suscripciones', () => listener.onChannelSubscription(userId, (e) => {
+    if (e.isGift) return;
+    const tier = TIER[e.tier] ?? '1';
+    const user = viewer(e.userId, e.userName, e.userDisplayName);
+    chatFeed.event({ platform: 'twitch', eventType: 'sub', user, amount: 1, tier, input: '' });
+    bus.emit({ platform: 'twitch', type: 'sub', name: 'sub', user, amount: 1, tier, months: 1, input: '' });
+  }));
+
+  // Resub (cuando el espectador comparte su mensaje de resuscripción en el chat)
+  safely('resubs', () => listener.onChannelSubscriptionMessage(userId, (e) => {
+    const tier = TIER[e.tier] ?? '1';
+    const months = e.cumulativeMonths ?? 1;
+    const user = viewer(e.userId, e.userName, e.userDisplayName);
+    chatFeed.event({ platform: 'twitch', eventType: 'sub', user, amount: months, tier, resub: true, input: e.messageText ?? '' });
+    bus.emit({ platform: 'twitch', type: 'sub', name: 'sub', user, amount: months, tier, months, resub: true, input: e.messageText ?? '' });
+  }));
+
+  // Subs regaladas: la regla se ejecuta una vez por cada sub del regalo
+  safely('subs regaladas', () => listener.onChannelSubscriptionGift(userId, (e) => {
+    const tier = TIER[e.tier] ?? '1';
+    const total = Math.max(1, e.amount ?? 1);
+    const user = e.isAnonymous ? viewer('anonimo', 'anonimo', 'Anónimo') : viewer(e.gifterId, e.gifterName, e.gifterDisplayName);
+    chatFeed.event({ platform: 'twitch', eventType: 'gift', user, amount: total, tier, input: '' });
+    for (let i = 0; i < Math.min(total, 100); i++) {
+      bus.emit({ platform: 'twitch', type: 'gift', name: 'gift', user, amount: total, tier, giftIndex: i, input: '' });
+    }
+  }));
+
+  // Raids hacia tu canal
+  safely('raids', () => listener.onChannelRaidTo(userId, (e) => {
+    const user = viewer(e.raidingBroadcasterId, e.raidingBroadcasterName, e.raidingBroadcasterDisplayName);
+    chatFeed.event({ platform: 'twitch', eventType: 'raid', user, amount: e.viewers, input: '' });
+    bus.emit({ platform: 'twitch', type: 'raid', name: 'raid', user, amount: e.viewers, input: '' });
+  }));
+
+  // Follows: cada persona cuenta una sola vez mientras la app está abierta (dejar de seguir y volver no repite)
+  const followed = new Set();
+  safely('follows', () => listener.onChannelFollow(userId, userId, (e) => {
+    if (followed.has(e.userId)) return;
+    followed.add(e.userId);
+    const user = viewer(e.userId, e.userName, e.userDisplayName);
+    chatFeed.event({ platform: 'twitch', eventType: 'follow', user, amount: 0, input: '' });
+    bus.emit({ platform: 'twitch', type: 'follow', name: 'follow', user, amount: 0, input: '' });
+  }));
+
+  // 5) Moderación hecha en Twitch (o desde la app): reflejarla en el panel
   listener.onChannelChatMessageDelete(userId, userId, (e) => chatFeed.deleted(e.messageId));
   listener.onChannelChatClearUserMessages(userId, userId, (e) => chatFeed.clearedUser(e.userId));
   listener.onChannelChatClear(userId, userId, () => chatFeed.cleared());

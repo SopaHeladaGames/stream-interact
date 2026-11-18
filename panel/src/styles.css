@@ -73,8 +73,8 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .segmented { display: inline-flex; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
 .segmented button { all: unset; cursor: pointer; padding: 5px 12px; border-radius: 6px; color: var(--muted); font-size: 12px; }
 .segmented button.active { background: var(--accent-2); color: white; }
-.segmented.wide { margin-bottom: 14px; }
-.segmented.wide button { padding: 7px 18px; font-size: 13px; }
+.segmented.wide { margin-bottom: 14px; flex-wrap: wrap; max-width: 100%; }
+.segmented.wide button { padding: 7px 14px; font-size: 13px; }
 
 /* --- Tarjetas y banners --- */
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
@@ -219,6 +219,9 @@ textarea { resize: vertical; line-height: 1.5; }
 .ev-reward { background: rgba(145, 70, 255, .12); border: 1px solid rgba(145, 70, 255, .35); }
 .ev-cheer { background: rgba(255, 179, 71, .1); border: 1px solid rgba(255, 179, 71, .35); }
 .ev-donation { background: rgba(61, 220, 132, .1); border: 1px solid rgba(61, 220, 132, .4); }
+.ev-sub, .ev-gift { background: rgba(255, 111, 216, .1); border: 1px solid rgba(255, 111, 216, .35); }
+.ev-raid { background: rgba(255, 138, 61, .1); border: 1px solid rgba(255, 138, 61, .4); }
+.ev-follow { background: rgba(255, 94, 138, .08); border: 1px solid rgba(255, 94, 138, .3); }
 .chat-event-input { margin-top: 2px; color: var(--muted); font-style: italic; }
 .chat-system { text-align: center; color: var(--muted); font-size: 12px; padding: 6px; font-style: italic; }
 .chat-box > .chat-jump { border: none; cursor: pointer; font: inherit; position: absolute; bottom: 72px; left: 50%; transform: translateX(-50%); background: var(--accent-2); color: white; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
@@ -579,3 +582,18 @@ select.invalid { border-color: var(--error); color: var(--error); }
 .paper-note.error { color: var(--danger, #ff5d6c); }
 .paper-changes ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; max-height: 160px; overflow: auto; }
 .paper-changes summary { cursor: pointer; color: var(--muted); }
+
+/* Perfil de juego (barra lateral) */
+.profile-switch { display: flex; flex-direction: column; gap: 4px; margin-top: auto; padding: 8px 6px 2px; font-size: 12px; color: var(--muted); }
+.profile-switch select { width: 100%; }
+.profile-switch + .panic { margin-top: 8px; }
+.profile-tag { font-size: 10.5px; padding: 1px 6px; border-radius: 4px; background: rgba(76, 195, 255, .14); color: #7fd4ff; flex-shrink: 0; }
+.profile-tag.off { opacity: .55; text-decoration: line-through; }
+.b-sub, .b-gift { background: rgba(255, 111, 216, .15); color: #ff8be0; }
+.b-raid { background: rgba(255, 138, 61, .15); color: #ffa766; }
+.b-follow { background: rgba(255, 94, 138, .15); color: #ff7fa3; }
+.profiles-card .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); font-size: 13px; }
+.profile-chip.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.profile-chip button { all: unset; cursor: pointer; opacity: .6; font-size: 12px; }
+.profile-chip button:hover { opacity: 1; }

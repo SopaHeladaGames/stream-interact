@@ -14,7 +14,8 @@ export default function Reglas() {
   const load = () => api.reglas()
     .then((d) => { setSaved(d); setDraft(structuredClone({ settings: d.settings, rules: d.rules })); })
     .catch((e) => setStatus({ type: 'error', text: e.message }));
-  useEffect(() => { load(); }, []);
+  const [profiles, setProfiles] = useState({ active: null, profiles: [] });
+  useEffect(() => { load(); api.perfiles().then(setProfiles).catch(() => {}); }, []);
 
   const dirty = useMemo(() => saved && draft &&
     JSON.stringify({ settings: saved.settings, rules: saved.rules }) !== JSON.stringify(draft), [saved, draft]);
@@ -104,6 +105,7 @@ export default function Reglas() {
               <div className="rule-item-main">
                 <span className={`badge b-${r.trigger?.type}`}>{TRIGGERS[r.trigger?.type]?.label ?? '?'}</span>
                 <span className="rule-name">{describeTrigger(r.trigger)}</span>
+                {r.profile && <span className={`profile-tag ${profiles.active !== r.profile ? 'off' : ''}`} title={profiles.active === r.profile ? 'Perfil activo' : 'Su perfil no está activo: no funciona ahora'}>{profiles.profiles.find((p) => p.id === r.profile)?.name ?? r.profile}</span>}
                 {r.target && r.target !== 'me' && <span className="target-tag" title={`Objetivo: ${TARGETS[r.target]?.label}`}>🎯</span>}
               </div>
               <label className="switch" onClick={(e) => e.stopPropagation()} title={r.enabled === false ? 'Desactivada' : 'Activa'}>

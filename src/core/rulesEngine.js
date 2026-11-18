@@ -62,7 +62,7 @@ export class RulesEngine {
       if (event.name === this.settings.helpCommand) return this.help(event);
     }
 
-    const rule = this.rules.find((r) => matches(r.trigger, event, this.settings));
+    const rule = this.rules.find((r) => this.inProfile(r) && matches(r.trigger, event, this.settings));
     if (!rule) {
       // Bits y donaciones se guardan aunque no tengan regla (para las estadísticas)
       if (event.type === 'cheer' || event.type === 'donation') this.#record(event, null, 'sin-regla');
@@ -72,7 +72,8 @@ export class RulesEngine {
     const now = Date.now();
     const ruleKey = rule.id ?? rule.trigger.name ?? JSON.stringify(rule.trigger);
     const userKey = `${ruleKey}:${event.user.id}`;
-    const paid = event.type === 'cheer' || event.type === 'donation';
+    // Bits, donaciones, subs y raids nunca se pierden: si hay cooldown, esperan su turno
+    const paid = PAID.has(event.type);
 
     // Límite por directo (ej. "Modo caos" una vez por directo)
     if (rule.maxPerStream && this.countThisStream) {
@@ -100,7 +101,7 @@ export class RulesEngine {
       const secs = Math.ceil(waitMs / 1000);
       log.info(`"${ruleKey}" de ${event.user.displayName} en espera ${secs}s por cooldown`);
       setTimeout(() => this.enqueueRule(rule, event, ruleKey), waitMs);
-      if (this.settings.cooldownReplies) await this.reply(event, `@${event.user.name} ¡gracias! Tu ${this.ruleLabel(rule.id)} llega en ${formatSecs(secs)} (hay otro en curso).`);
+      if (this.settings.cooldownReplies && !event.giftIndex) await this.reply(event, `@${event.user.name} ¡gracias! Tu ${this.ruleLabel(rule.id)} llega en ${formatSecs(secs)} (hay otro en curso).`);
       return;
     }
 
@@ -147,7 +148,12 @@ export class RulesEngine {
       amount: String(event.amount ?? 0),
       currency: event.currency ?? '',
       money: event.type === 'donation' ? formatMoney(event.amount, event.currency) : String(event.amount ?? 0),
-      platform: event.platform
+      platform: event.platform,
+      // Subs, regalos y raids: {amount} sirve igual, estos nombres son para que la regla se lea mejor
+      tier: event.tier ?? '',
+      months: String(event.months ?? event.amount ?? 0),
+      gifts: String(event.type === 'gift' ? event.amount ?? 1 : 0),
+      viewers: String(event.type === 'raid' ? event.amount ?? 0 : 0)
     };
 
     const accepted = this.bus.enqueue(ruleKey, async () => {
@@ -217,8 +223,13 @@ export class RulesEngine {
   }
 
   /** La regla que se usaría para este evento (la primera que coincide), o null. */
+  /** Las reglas con perfil de juego solo funcionan cuando ese perfil está activo. */
+  inProfile(rule) {
+    return !rule.profile || rule.profile === this.getActiveProfile?.();
+  }
+
   findRule(event) {
-    return this.rules.find((r) => matches(r.trigger, event, this.settings)) ?? null;
+    return this.rules.find((r) => this.inProfile(r) && matches(r.trigger, event, this.settings)) ?? null;
   }
 
   /** ¿Existe una regla activa con ese id? */
@@ -262,7 +273,7 @@ export class RulesEngine {
     if (now - this.lastHelp < this.settings.helpCooldownMs) return;
     this.lastHelp = now;
     const commands = [...new Set(this.rules
-      .filter((r) => r.trigger?.type === 'command' && r.trigger.name && (!r.trigger.platform || r.trigger.platform === event.platform))
+      .filter((r) => this.inProfile(r) && r.trigger?.type === 'command' && r.trigger.name && (!r.trigger.platform || r.trigger.platform === event.platform))
       .map((r) => r.trigger.name))];
     const msg = commands.length
       ? `Comandos: ${commands.join(' ')} · También puedes canjear recompensas con puntos del canal.`
@@ -282,6 +293,8 @@ export function bitsValue(event, rates = {}) {
   return rate > 0 ? Math.floor((event.amount ?? 0) * rate) : null;
 }
 
+const PAID = new Set(['cheer', 'donation', 'sub', 'gift', 'raid']);
+
 function matches(trigger, event, settings = {}) {
   if (!trigger) return false;
   // Regla de bits que también acepta donaciones por su equivalente en bits
@@ -298,6 +311,9 @@ function matches(trigger, event, settings = {}) {
   if (trigger.minAmount && (event.amount ?? 0) < trigger.minAmount) return false;
   if (trigger.maxAmount && (event.amount ?? 0) > trigger.maxAmount) return false;
   if (trigger.currency && trigger.currency.toUpperCase() !== String(event.currency ?? '').toUpperCase()) return false;
+  if (trigger.tier && String(trigger.tier) !== String(event.tier ?? '')) return false;
+  if (trigger.type === 'sub' && trigger.resub === 'new' && event.resub) return false;
+  if (trigger.type === 'sub' && trigger.resub === 'resub' && !event.resub) return false;
   return true;
 }
 

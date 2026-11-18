@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { ACTIONS, MC_COLORS, TARGETS, TRIGGERS, VARIABLES } from '../rules.js';
+import { ACTIONS, MC_COLORS, TARGETS, TIERS, TRIGGERS, VARIABLES } from '../rules.js';
 
 /** Convierte ms ↔ segundos para que en el formulario todo se vea en segundos. */
 const toSecs = (ms) => (ms == null ? '' : ms / 1000);
@@ -13,6 +13,8 @@ export default function RuleEditor({ rule, onChange }) {
   // Reglas del mundo disponibles (para la acción "Regla del mundo")
   const [gamerules, setGamerules] = useState([]);
   useEffect(() => { api.catalogoGamerules().then(setGamerules).catch(() => {}); }, []);
+  const [profiles, setProfiles] = useState([]);
+  useEffect(() => { api.perfiles().then((r) => setProfiles(r.profiles)).catch(() => {}); }, []);
 
   const t = rule.trigger ?? {};
   const set = (patch) => onChange({ ...rule, ...patch });
@@ -21,6 +23,7 @@ export default function RuleEditor({ rule, onChange }) {
   const changeTriggerType = (type) => {
     if (type === 'cheer') setTrigger({ type, name: undefined, currency: undefined, minAmount: t.minAmount ?? 100 });
     else if (type === 'donation') setTrigger({ type, name: undefined, minAmount: t.type === 'cheer' ? 50 : (t.minAmount ?? 50) });
+    else if (['sub', 'gift', 'raid', 'follow'].includes(type)) setTrigger({ type, name: undefined, currency: undefined, includeDonations: undefined, minAmount: undefined, maxAmount: undefined, tier: undefined, resub: undefined });
     else setTrigger({ type, name: type === 'command' ? (t.name?.startsWith('!') ? t.name : '!comando') : (t.name ?? ''), minAmount: undefined, maxAmount: undefined, currency: undefined });
   };
 
@@ -92,10 +95,80 @@ export default function RuleEditor({ rule, onChange }) {
               </label>
             </>
           )}
+          {t.type === 'sub' && (
+            <>
+              <label className="field">
+                <span>Tipo</span>
+                <select value={t.resub ?? ''} onChange={(e) => setTrigger({ resub: e.target.value || undefined })}>
+                  <option value="">Sub nueva o resub</option>
+                  <option value="new">Solo subs nuevas</option>
+                  <option value="resub">Solo resubs</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Tier</span>
+                <select value={t.tier ?? ''} onChange={(e) => setTrigger({ tier: e.target.value || undefined })}>
+                  {Object.entries(TIERS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span>Mínimo de meses (opcional)</span>
+                <input type="number" min="1" value={t.minAmount ?? ''} placeholder="—" onChange={(e) => setTrigger({ minAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+              </label>
+              <label className="field">
+                <span>Máximo de meses (opcional)</span>
+                <input type="number" min="1" value={t.maxAmount ?? ''} placeholder="—" onChange={(e) => setTrigger({ maxAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+              </label>
+              <p className="muted small field-note">
+                Twitch solo avisa de una resub cuando el espectador comparte su mensaje de resuscripción en el chat. Prime cuenta como Tier 1.
+              </p>
+            </>
+          )}
+          {t.type === 'gift' && (
+            <>
+              <label className="field">
+                <span>Tier</span>
+                <select value={t.tier ?? ''} onChange={(e) => setTrigger({ tier: e.target.value || undefined })}>
+                  {Object.entries(TIERS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span>Mínimo de subs en el regalo (opcional)</span>
+                <input type="number" min="1" value={t.minAmount ?? ''} placeholder="—" onChange={(e) => setTrigger({ minAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+              </label>
+              <label className="field">
+                <span>Máximo de subs en el regalo (opcional)</span>
+                <input type="number" min="1" value={t.maxAmount ?? ''} placeholder="—" onChange={(e) => setTrigger({ maxAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+              </label>
+              <p className="muted small field-note">
+                La regla se ejecuta <strong>una vez por cada sub regalada</strong>: un regalo de 5 subs la ejecuta 5 veces (y muestra una sola alerta).
+                El mínimo y máximo se comparan con el tamaño del regalo: por ejemplo, una regla para regalos de 5+ y otra para el resto.
+              </p>
+            </>
+          )}
+          {t.type === 'raid' && (
+            <>
+              <label className="field">
+                <span>Mínimo de viewers (opcional)</span>
+                <input type="number" min="1" value={t.minAmount ?? ''} placeholder="—" onChange={(e) => setTrigger({ minAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+              </label>
+              <label className="field">
+                <span>Máximo de viewers (opcional)</span>
+                <input type="number" min="1" value={t.maxAmount ?? ''} placeholder="—" onChange={(e) => setTrigger({ maxAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+              </label>
+              <p className="muted small field-note">{'{user}'} es el canal que hizo la raid y {'{viewers}'} cuántos llegaron.</p>
+            </>
+          )}
+          {t.type === 'follow' && (
+            <p className="muted small field-note">
+              Cada persona cuenta una sola vez mientras la app está abierta (dejar de seguir y volver a seguir no la repite).
+              Te recomiendo un cooldown general para que una ola de follows no llene el mundo de mobs.
+            </p>
+          )}
         </div>
 
-        {(t.type === 'donation' || t.type === 'cheer') && (
-          <p className="muted small">Bits y donaciones son dinero: <strong>nunca se pierden</strong>. Si llegan durante el cooldown, se ejecutan cuando termine (se avisa en el chat).</p>
+        {['donation', 'cheer', 'sub', 'gift', 'raid'].includes(t.type) && (
+          <p className="muted small">Bits, donaciones, subs y raids <strong>nunca se pierden</strong>: si llegan durante el cooldown, se ejecutan cuando termine (se avisa en el chat).</p>
         )}
         <div className="field-row">
           <>
@@ -103,7 +176,7 @@ export default function RuleEditor({ rule, onChange }) {
             <span>Cooldown general (s)</span>
             <input type="number" min="0" value={toSecs(rule.cooldownMs)} onChange={(e) => set({ cooldownMs: toMs(e.target.value) })} placeholder="0" />
           </label>
-          {t.type !== 'donation' && t.type !== 'cheer' && (
+          {!['donation', 'cheer', 'sub', 'gift', 'raid'].includes(t.type) && (
           <label className="field">
             <span>Cooldown por usuario (s)</span>
             <input type="number" min="0" value={toSecs(rule.userCooldownMs)} onChange={(e) => set({ userCooldownMs: toMs(e.target.value) })} placeholder="0" />
@@ -114,6 +187,14 @@ export default function RuleEditor({ rule, onChange }) {
             <span>Máximo por directo</span>
             <input type="number" min="1" value={rule.maxPerStream ?? ''} placeholder="Sin límite"
               onChange={(e) => set({ maxPerStream: e.target.value === '' ? undefined : Math.max(1, Math.round(Number(e.target.value))) })} />
+          </label>
+          <label className="field" title="La regla solo funciona cuando este perfil de juego está activo">
+            <span>Perfil de juego</span>
+            <select value={rule.profile ?? ''} onChange={(e) => set({ profile: e.target.value || undefined })}>
+              <option value="">Siempre</option>
+              {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {rule.profile && !profiles.some((p) => p.id === rule.profile) && <option value={rule.profile}>{rule.profile}</option>}
+            </select>
           </label>
           <label className="field">
             <span>ID interno</span>
@@ -372,6 +453,8 @@ function TargetSection({ rule, set }) {
         {mode === 'chat' && <>
           {type === 'reward' && <>El espectador escribe el nombre al canjear. En <strong>Recompensas</strong> activa “Pedir texto al espectador” y en la descripción pon algo como “¿A quién? (Many, SopaHelada…)”. </>}
           {type === 'command' && <>El espectador escribe el nombre después del comando, por ejemplo <code>{rule.trigger?.name || '!comando'} Many</code>. Sin nombre te toca a ti. </>}
+          {type === 'sub' && <>Se busca un nombre en el mensaje de la resub; si no hay uno, te toca a ti. </>}
+          {['gift', 'raid', 'follow'].includes(type) && <>Estos eventos no traen texto para elegir, así que te toca a ti. Para otros jugadores usa “Al azar” o “Todos”. </>}
           {(type === 'cheer' || type === 'donation') && <>Se busca un nombre en el mensaje del {type === 'cheer' ? 'cheer' : 'donativo'}; si no hay uno válido te toca a ti (nunca se pierde un {type === 'cheer' ? 'cheer' : 'donativo'}). </>}
           {(type === 'reward' || type === 'command') && 'Si el jugador no está conectado o está protegido, no se ejecuta, se le avisa en el chat y se devuelven los puntos.'}
         </>}

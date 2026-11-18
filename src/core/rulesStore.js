@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { GAMERULES } from '../gamerules.js';
 
-export const TRIGGER_TYPES = ['reward', 'command', 'cheer', 'donation'];
+export const TRIGGER_TYPES = ['reward', 'command', 'cheer', 'donation', 'sub', 'gift', 'raid', 'follow'];
 export const TARGETS = ['me', 'chat', 'random', 'all'];
 
 /**

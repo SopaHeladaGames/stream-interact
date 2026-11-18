@@ -22,7 +22,9 @@ export const config = {
       'user:write:chat',            // responder en el chat
       'bits:read',                  // cheers
       'moderator:manage:chat_messages', // borrar mensajes desde el panel
-      'moderator:manage:banned_users'   // timeout / ban desde el panel
+      'moderator:manage:banned_users',  // timeout / ban desde el panel
+      'channel:read:subscriptions',     // suscripciones y subs regaladas
+      'moderator:read:followers'        // follows
     ]
   },
   minecraft: {

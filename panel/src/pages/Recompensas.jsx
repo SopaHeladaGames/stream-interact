@@ -13,14 +13,17 @@ export default function Recompensas({ conectado }) {
   const [editing, setEditing] = useState(null); // id de la recompensa en edición
   const [busyId, setBusyId] = useState(null);
   const [onlyApp, setOnlyApp] = useState(false);
+  const [profiles, setProfiles] = useState({ active: null, profiles: [], rewards: {} });
+  const [newProfile, setNewProfile] = useState('');
   const formRef = useRef(null);
 
   const load = async () => {
     setError(null);
     try {
-      const [rw, rl] = await Promise.all([api.recompensas(), api.reglas()]);
+      const [rw, rl, pf] = await Promise.all([api.recompensas(), api.reglas(), api.perfiles()]);
       setRewards(rw);
       setRules(rl);
+      setProfiles(pf);
     } catch (e) { setError(e.message); }
   };
   useEffect(() => { if (conectado) load(); }, [conectado]);
@@ -89,6 +92,39 @@ export default function Recompensas({ conectado }) {
     formRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // ---- Perfiles de juego ----
+  const profileName = (id) => profiles.profiles.find((p) => p.id === id)?.name;
+  const addProfile = async (e) => {
+    e.preventDefault();
+    try { setProfiles(await api.crearPerfil(newProfile)); setNewProfile(''); } catch (err) { setError(err.message); }
+  };
+  const renameProfile = async (p) => {
+    const name = prompt('Nuevo nombre del perfil', p.name);
+    if (!name || name === p.name) return;
+    try { setProfiles(await api.renombrarPerfil(p.id, name)); } catch (err) { setError(err.message); }
+  };
+  const deleteProfile = async (p) => {
+    if (!confirm(`¿Borrar el perfil "${p.name}"?\n\nSus recompensas quedan sin perfil (no se borran de Twitch) y sus reglas pasan a funcionar siempre.`)) return;
+    try { setProfiles(await api.borrarPerfil(p.id)); await load(); } catch (err) { setError(err.message); }
+  };
+  const activateProfile = async (id) => {
+    setError(null);
+    try {
+      const r = await api.activarPerfil(id);
+      const name = profileName(id) ?? 'ninguno';
+      setNotice(`Perfil activo: ${name}.${r.enabled || r.disabled ? ` ${r.enabled} recompensas encendidas y ${r.disabled} apagadas.` : ''}${r.failed?.length ? ` No se pudieron cambiar: ${r.failed.map((f) => f.title).join(', ')}.` : ''}`);
+      await load();
+    } catch (err) { setError(err.message); }
+  };
+  const assignProfile = async (reward, profileId) => {
+    setBusyId(reward.id); setError(null);
+    try {
+      const r = await api.asignarPerfil(reward.id, profileId || null);
+      setProfiles(r);
+      if (r.enabled !== null && r.enabled !== undefined) setRewards((rs) => rs.map((x) => (x.id === reward.id ? { ...x, enabled: r.enabled } : x)));
+    } catch (err) { setError(err.message); } finally { setBusyId(null); }
+  };
+
   if (!conectado) {
     return <><h1>Recompensas</h1><div className="banner warn">Conecta tu cuenta de Twitch para ver tus recompensas.</div></>;
   }
@@ -113,14 +149,39 @@ export default function Recompensas({ conectado }) {
         </p>
       )}
 
+      <div className="card profiles-card">
+        <div className="row between wrap gap">
+          <h3 className="no-margin">Perfiles de juego</h3>
+          <form className="row gap" onSubmit={addProfile}>
+            <input value={newProfile} maxLength={30} placeholder="Minecraft, Terraria…" onChange={(e) => setNewProfile(e.target.value)} />
+            <button className="btn small" disabled={!newProfile.trim()}>+ Perfil</button>
+          </form>
+        </div>
+        <p className="muted small">
+          Asigna recompensas (columna <strong>Perfil</strong>) y reglas (en el editor de reglas) a un perfil. Al activar un perfil se encienden
+          sus recompensas y reglas y se apagan las de los demás. Lo que no tiene perfil funciona siempre. También lo puedes cambiar desde la barra lateral.
+        </p>
+        <div className="chips">
+          <button className={`profile-chip ${!profiles.active ? 'active' : ''}`} onClick={() => activateProfile(null)} title="Apaga las recompensas y reglas de todos los perfiles">Ninguno</button>
+          {profiles.profiles.map((p) => (
+            <span key={p.id} className={`profile-chip ${profiles.active === p.id ? 'active' : ''}`}>
+              <button style={{ opacity: 1, fontWeight: 600 }} onClick={() => activateProfile(p.id)} title="Activar este perfil">{profiles.active === p.id ? '● ' : '○ '}{p.name}</button>
+              <span className="muted small">{p.rewards} rec.</span>
+              <button onClick={() => renameProfile(p)} title="Cambiar nombre">✎</button>
+              <button onClick={() => deleteProfile(p)} title="Borrar perfil">✕</button>
+            </span>
+          ))}
+        </div>
+      </div>
+
       <div className="card flush">
         <table className="table rewards">
           <thead>
-            <tr><th>Recompensa</th><th>Costo</th><th>Activa</th><th>Canjes</th><th>Regla</th><th /></tr>
+            <tr><th>Recompensa</th><th>Costo</th><th>Activa</th><th>Canjes</th><th>Perfil</th><th>Regla</th><th /></tr>
           </thead>
           <tbody>
-            {rewards === null && <tr><td colSpan={6} className="muted">Cargando…</td></tr>}
-            {visible?.length === 0 && <tr><td colSpan={6} className="muted">No hay recompensas que mostrar.</td></tr>}
+            {rewards === null && <tr><td colSpan={7} className="muted">Cargando…</td></tr>}
+            {visible?.length === 0 && <tr><td colSpan={7} className="muted">No hay recompensas que mostrar.</td></tr>}
             {visible?.map((r) => {
               const rule = ruleFor(r.title);
               const busy = busyId === r.id;
@@ -156,6 +217,15 @@ export default function Recompensas({ conectado }) {
                       </button>
                     )}
                   </td>
+                  <td>
+                    {locked ? <span className="muted small" title="Twitch no deja que la app la encienda o apague">—</span> : (
+                      <select value={profiles.rewards[r.id] ?? ''} disabled={busy || profiles.profiles.length === 0} onChange={(e) => assignProfile(r, e.target.value)}
+                        title={profiles.profiles.length === 0 ? 'Crea un perfil arriba' : 'Se enciende solo cuando este perfil está activo'}>
+                        <option value="">Siempre</option>
+                        {profiles.profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    )}
+                  </td>
                   <td>{rule ? <span className="pill ok" title={`Regla "${rule.id}"`}>{rule.enabled === false ? 'Sí (desactivada)' : 'Sí'}</span> : <span className="pill off" title="Crea una regla de tipo Recompensa con este título">Sin regla</span>}</td>
                   <td className="nowrap actions-cell">
                     {locked ? (
@@ -170,7 +240,7 @@ export default function Recompensas({ conectado }) {
                 </tr>,
                 editing === r.id && (
                   <tr key={`${r.id}-edit`} className="edit-row">
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <EditReward reward={r} hasRule={Boolean(rule)} busy={busy} onCancel={() => setEditing(null)} onSave={(v, upd) => saveEdit(r, v, upd)} />
                     </td>
                   </tr>

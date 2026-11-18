@@ -273,6 +273,14 @@ function ChatEvent({ e, showTime }) {
         <span>🎁 <strong>{name}</strong> canjeó <strong>{e.title}</strong> <span className="muted">({e.amount.toLocaleString('es-MX')})</span></span>
       ) : e.eventType === 'donation' ? (
         <span>💵 <strong>{name}</strong> donó <strong>{e.money}</strong> <span className="muted">· {DONATION_SOURCES[e.platform] ?? e.platform}{e.isTest ? ' · prueba' : ''}</span></span>
+      ) : e.eventType === 'sub' ? (
+        <span>⭐ <strong>{name}</strong> {e.resub ? <>se resuscribió · <strong>{e.amount} meses</strong></> : 'se suscribió'}{e.tier && e.tier !== '1' ? <span className="muted"> · Tier {e.tier}</span> : null}</span>
+      ) : e.eventType === 'gift' ? (
+        <span>🎁 <strong>{name}</strong> regaló <strong>{e.amount} {e.amount === 1 ? 'sub' : 'subs'}</strong>{e.tier && e.tier !== '1' ? <span className="muted"> · Tier {e.tier}</span> : null}</span>
+      ) : e.eventType === 'raid' ? (
+        <span>🚀 <strong>{name}</strong> llegó con una raid de <strong>{e.amount} viewers</strong></span>
+      ) : e.eventType === 'follow' ? (
+        <span>❤️ <strong>{name}</strong> ahora te sigue</span>
       ) : (
         <span>💎 <strong>{name}</strong> mandó <strong>{e.amount.toLocaleString('es-MX')} bits</strong></span>
       )}

@@ -10,7 +10,7 @@
     /overlay?widget=votacion    solo votación
     /overlay?widget=estado      solo contadores (reglas del mundo temporales y modo caos)
     /overlay?widget=top         solo top del directo
-  Opciones: &sonido=0 (sin sonido)  &preview=1 (fondo de cuadros)  &demo=reward|cheer|donation|command|poll|chaos  &demopoll=1  &demoextras=1
+  Opciones: &sonido=0 (sin sonido)  &preview=1 (fondo de cuadros)  &demo=reward|cheer|donation|command|poll|chaos|sub|raid|follow  &demopoll=1  &demoextras=1
 -->
 <style>
   @font-face { font-family: 'SI Inter'; src: url('/overlay/fonts/inter-800.woff2') format('woff2'); font-weight: 800; }
@@ -238,7 +238,7 @@
   const mute = params.get('sonido') === '0' || Boolean(demo);
   if (params.get('preview') === '1') document.body.classList.add('preview');
 
-  const ICONS = { reward: '🎁', cheer: '💎', donation: '💵', command: '💬', poll: '🗳️', chaos: '⚡', custom: '✨' };
+  const ICONS = { reward: '🎁', cheer: '💎', donation: '💵', command: '💬', poll: '🗳️', chaos: '⚡', sub: '⭐', raid: '🚀', follow: '❤️', custom: '✨' };
   const FONTS = {
     segoe: ["'Segoe UI', 'SI Inter', system-ui, sans-serif", 1],
     inter: ["'SI Inter', 'Segoe UI', sans-serif", 1],
@@ -254,7 +254,10 @@
     donation: { title: 'Luisa', subtitle: 'donó $50.00 MXN', detail: '¡Saludos desde León!' },
     command: { title: 'Ana', subtitle: 'usó !zombis', target: 'ManyGamer123' },
     poll: { title: 'El chat decidió', subtitle: 'Creeper sorpresa' },
-    chaos: { title: 'Modo caos', subtitle: '!salto' }
+    chaos: { title: 'Modo caos', subtitle: '!salto' },
+    sub: { title: 'Carla', subtitle: 'se resuscribió · 6 meses', detail: '¡Medio año ya!' },
+    raid: { title: 'OtroStreamer', subtitle: 'llegó con una raid de 42 viewers' },
+    follow: { title: 'NuevoAmigo', subtitle: 'ahora te sigue' }
   };
 
   let config = null;

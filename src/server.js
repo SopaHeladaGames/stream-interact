@@ -22,7 +22,7 @@ export function createServer() {
 }
 
 /** Envuelve handlers async para que los errores respondan JSON en vez de tumbar el servidor. */
-const route = (fn) => async (req, res) => {
+export const route = (fn) => async (req, res) => {
   try {
     const result = await fn(req, res);
     if (!res.headersSent) res.json(result ?? { ok: true });

@@ -17,7 +17,7 @@ export default function Probar() {
   const fire = async (event) => {
     try {
       await api.simular({ ...event, user: user || 'Tester' });
-      notify(`Enviado: ${event.type} ${event.name === 'bits' ? `${event.amount} bits` : event.name}`);
+      notify(`Enviado: ${TRIGGERS[event.type]?.label ?? event.type} ${event.name === 'bits' ? `${event.amount} bits` : ['sub', 'gift', 'raid'].includes(event.type) ? event.amount : event.type === 'follow' ? '' : event.name}`);
     } catch (e) { notify(e.message, 'error'); }
   };
 
@@ -64,7 +64,22 @@ export default function Probar() {
               {Object.entries(TRIGGERS).map(([t, info]) => <option key={t} value={t}>{info.label}</option>)}
             </select>
           </label>
-          {custom.type === 'cheer' || custom.type === 'donation' ? (
+          {['sub', 'gift', 'raid'].includes(custom.type) ? (
+            <>
+              <label className="field">
+                <span>{custom.type === 'sub' ? 'Meses' : custom.type === 'gift' ? 'Subs regaladas' : 'Viewers'}</span>
+                <input type="number" min="1" max={custom.type === 'gift' ? 100 : undefined} value={custom.amount} onChange={(e) => setCustom({ ...custom, amount: Number(e.target.value) })} />
+              </label>
+              {custom.type !== 'raid' && (
+                <label className="field narrow">
+                  <span>Tier</span>
+                  <select value={custom.tier ?? '1'} onChange={(e) => setCustom({ ...custom, tier: e.target.value })}>
+                    <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                  </select>
+                </label>
+              )}
+            </>
+          ) : custom.type === 'follow' ? null : custom.type === 'cheer' || custom.type === 'donation' ? (
             <>
               <label className="field">
                 <span>{custom.type === 'cheer' ? 'Bits' : 'Monto'}</span>
@@ -90,7 +105,8 @@ export default function Probar() {
           <button className="btn primary align-end" onClick={() => fire(
             custom.type === 'cheer' ? { type: 'cheer', name: 'bits', amount: custom.amount, input: custom.input }
               : custom.type === 'donation' ? { type: 'donation', name: 'donation', amount: custom.amount, currency: custom.currency ?? 'MXN', input: custom.input }
-                : { type: custom.type, name: custom.name, input: custom.input })}>Enviar</button>
+                : ['sub', 'gift', 'raid', 'follow'].includes(custom.type) ? { type: custom.type, name: custom.type, amount: custom.amount, tier: custom.tier ?? '1', input: custom.input }
+                  : { type: custom.type, name: custom.name, input: custom.input })}>Enviar</button>
         </div>
       </div>
 

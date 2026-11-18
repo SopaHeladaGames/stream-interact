@@ -86,6 +86,16 @@ export default function App() {
   };
 
   // La votación se muestra sobre el chat mientras está activa y unos segundos después (resultado)
+  const [switchingProfile, setSwitchingProfile] = useState(false);
+  const changeProfile = async (id) => {
+    setSwitchingProfile(true);
+    try {
+      const r = await api.activarPerfil(id || null);
+      setEstado((e) => (e ? { ...e, profile: e.profiles.find((p) => p.id === r.active) ?? null } : e));
+      if (r.failed?.length) alert(`No se pudieron cambiar: ${r.failed.map((f) => f.title).join(', ')}`);
+    } catch (err) { alert(err.message); } finally { setSwitchingProfile(false); }
+  };
+
   const pollLive = Boolean(estado?.poll?.active)
     || (estado?.poll?.lastEndedAt != null && Date.now() - new Date(estado.poll.lastEndedAt).getTime() < 20000);
 
@@ -115,6 +125,15 @@ export default function App() {
             </button>
           ))}
         </nav>
+        {estado?.profiles?.length > 0 && (
+          <label className="profile-switch" title="Perfil de juego: enciende sus reglas y recompensas y apaga las de los demás">
+            <span>🎮 Perfil</span>
+            <select value={estado.profile?.id ?? ''} disabled={switchingProfile} onChange={(e) => changeProfile(e.target.value)}>
+              <option value="">Ninguno</option>
+              {estado.profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+        )}
         <button
           className={`panic ${estado?.paused ? 'paused' : ''}`}
           onClick={togglePause}

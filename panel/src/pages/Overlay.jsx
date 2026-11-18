@@ -15,7 +15,10 @@ const KINDS = [
   { id: 'donation', label: 'Donación', icon: '💵' },
   { id: 'command', label: 'Comando', icon: '💬' },
   { id: 'poll', label: 'Votación', icon: '🗳️' },
-  { id: 'chaos', label: 'Caos', icon: '⚡' }
+  { id: 'chaos', label: 'Caos', icon: '⚡' },
+  { id: 'sub', label: 'Subs', icon: '⭐' },
+  { id: 'raid', label: 'Raid', icon: '🚀' },
+  { id: 'follow', label: 'Follow', icon: '❤️' }
 ];
 const POSITIONS = [
   ['top-left', 'top-center', 'top-right'],

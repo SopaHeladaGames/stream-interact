@@ -34,6 +34,16 @@ export function autoAlert(event, label) {
       return { kind: 'donation', title: user, subtitle: `${event.name === 'subscription' ? 'se suscribió con' : 'donó'} ${formatMoney(event.amount, event.currency)}`, detail: input };
     case 'command':
       return { kind: 'command', title: user, subtitle: `usó ${label}`, detail: input };
+    case 'sub': {
+      const tier = event.tier && event.tier !== '1' ? ` (Tier ${event.tier})` : '';
+      return { kind: 'sub', title: user, subtitle: event.resub ? `se resuscribió · ${event.months ?? event.amount} meses${tier}` : `se suscribió${tier}`, detail: input };
+    }
+    case 'gift':
+      return { kind: 'sub', title: user, subtitle: `regaló ${event.amount} ${event.amount === 1 ? 'sub' : 'subs'}` };
+    case 'raid':
+      return { kind: 'raid', title: user, subtitle: `llegó con una raid de ${event.amount} ${event.amount === 1 ? 'viewer' : 'viewers'}` };
+    case 'follow':
+      return { kind: 'follow', title: user, subtitle: 'ahora te sigue' };
     case 'poll':
       return { kind: 'poll', title: 'El chat decidió', subtitle: label };
     case 'chaos':
