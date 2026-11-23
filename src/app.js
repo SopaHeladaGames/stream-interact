@@ -237,6 +237,36 @@ export async function startApp(options = {}) {
   });
   log.info(`🌐 Panel en http://localhost:${config.port}`);
 
+  // "localhost" en Windows suele ir primero a IPv6 (::1). Si otro proyecto (ej. un servidor de npm en el
+  // mismo puerto) escucha ahí, el panel, el overlay de OBS y el login de Twitch llegarían a ese programa.
+  // Por eso también se escucha en ::1, y se revisa que quien responda en localhost sea esta app.
+  const server6 = await new Promise((resolve) => {
+    const s6 = app.listen(config.port, '::1', () => resolve(s6));
+    s6.once('error', (err) => {
+      if (err.code !== 'EADDRNOTAVAIL' && err.code !== 'EAFNOSUPPORT') log.warn(`No pude escuchar en IPv6 (::1:${config.port}): ${err.code ?? err.message}`);
+      resolve(null);
+    });
+  });
+  let portWarned = false;
+  const checkPortOwner = async () => {
+    for (const host of ['localhost', '[::1]']) {
+      try {
+        const res = await fetch(`http://${host}:${config.port}/api/estado`, { signal: AbortSignal.timeout(3000) });
+        if (res.headers.get('x-sopa-chatbot') === '1') continue;
+        const msg = `Otro programa está usando el puerto ${config.port} (por ejemplo, otro proyecto que iniciaste con npm). `
+          + `Mientras siga abierto, el panel, el overlay de OBS y el login de Twitch pueden abrir ese programa en vez de Sopa-ChatBot. `
+          + `Ciérralo o cámbiale el puerto y reinicia Sopa-ChatBot.`;
+        log.error(msg);
+        if (!portWarned) { portWarned = true; options.onPortConflict?.(msg); }
+        return;
+      } catch { /* nadie responde en esa dirección: está bien */ }
+    }
+    portWarned = false;
+  };
+  setTimeout(checkPortOwner, 2000);
+  const portTimer = setInterval(checkPortOwner, 60e3);
+  portTimer.unref?.();
+
   // Reintentar RCON en silencio cada 10 s y detectar servidores arrancados fuera de la app
   await mc.tryConnect();
   mcServer.markExternal(mc.connected);
@@ -284,6 +314,9 @@ export async function startApp(options = {}) {
     backups.dispose();
     gamerules.dispose();
     mc.close();
+    clearInterval(portTimer);
+    server6?.close();
+    server6?.closeAllConnections?.();
     const closed = new Promise((r) => server.close(() => r()));
     server.closeAllConnections?.(); // el feed en vivo mantiene conexiones abiertas
     await closed;

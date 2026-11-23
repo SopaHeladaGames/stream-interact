@@ -73,6 +73,10 @@ async function boot() {
       },
       // Abrir una carpeta en el Explorador (respaldos)
       openPath: (p) => shell.openPath(p),
+      // Otro programa respondiendo en el mismo puerto (ej. otro proyecto de npm en el 3000)
+      onPortConflict: (message) => {
+        dialog.showMessageBox(win ?? undefined, { type: 'warning', title: `${APP_NAME}: puerto ocupado`, message: 'Otro programa está usando el puerto del panel', detail: message }).catch(() => {});
+      },
       // Actualizaciones (solo en la versión instalada): el panel muestra el aviso y el botón
       updates: { status: () => ({ current: app.getVersion(), packaged: app.isPackaged, state: update.state, newVersion: update.version, progress: update.progress, error: update.error }), install: installUpdate, check: () => checkForUpdates(true) }
     });

@@ -17,6 +17,8 @@ import { GAMERULES } from './gamerules.js';
  */
 export function createServer() {
   const app = express();
+  // Firma para saber si quien responde en el puerto es esta app (y no otro proyecto con el mismo puerto)
+  app.use((_req, res, next) => { res.setHeader('X-Sopa-ChatBot', '1'); next(); });
   app.use(express.json({ limit: '1mb' }));
   return app;
 }
