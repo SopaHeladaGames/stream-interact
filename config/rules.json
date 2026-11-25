@@ -17,7 +17,6 @@
         "type": "command",
         "name": "!zombis"
       },
-      "target": "random",
       "userCooldownMs": 60000,
       "actions": [
         {
@@ -36,7 +35,9 @@
           "type": "chat",
           "message": "🧟 {user} le mandó una horda de zombis a {target}"
         }
-      ]
+      ],
+      "enabled": false,
+      "target": "chat"
     },
     {
       "id": "cholos",
@@ -44,7 +45,6 @@
         "type": "command",
         "name": "!cholos"
       },
-      "target": "random",
       "cooldownMs": 300000,
       "actions": [
         {
@@ -63,7 +63,9 @@
           "type": "chat",
           "message": "💀 {user} mandó a los cholos por {target}"
         }
-      ]
+      ],
+      "enabled": false,
+      "target": "chat"
     },
     {
       "id": "creepers",
@@ -71,7 +73,6 @@
         "type": "command",
         "name": "!creepers"
       },
-      "target": "random",
       "cooldownMs": 600000,
       "actions": [
         {
@@ -91,7 +92,9 @@
           "type": "chat",
           "message": "💥 {user} rodeó a {target} con 10 creepers"
         }
-      ]
+      ],
+      "enabled": false,
+      "target": "chat"
     },
     {
       "id": "hambre",
@@ -99,7 +102,6 @@
         "type": "command",
         "name": "!hambre"
       },
-      "target": "all",
       "cooldownMs": 1800000,
       "actions": [
         {
@@ -118,7 +120,9 @@
           "type": "chat",
           "message": "🍗 {user} le dio hambre a todos por 2 minutos"
         }
-      ]
+      ],
+      "enabled": false,
+      "target": "chat"
     },
     {
       "id": "esqueletos",
@@ -126,7 +130,6 @@
         "type": "command",
         "name": "!esqueletos"
       },
-      "target": "all",
       "cooldownMs": 300000,
       "actions": [
         {
@@ -145,7 +148,9 @@
           "type": "chat",
           "message": "🏹 {user} mandó una patrulla de esqueletos a todos"
         }
-      ]
+      ],
+      "enabled": false,
+      "target": "chat"
     },
     {
       "id": "lento",
@@ -153,13 +158,12 @@
         "type": "command",
         "name": "!lento"
       },
-      "target": "all",
-      "cooldownMs": 1200000,
+      "cooldownMs": 60000,
       "actions": [
         {
           "type": "minecraft",
           "commands": [
-            "effect give {target} minecraft:slowness 10 1"
+            "effect give {target} minecraft:slowness 10 100"
           ],
           "repeat": 1
         },
@@ -172,7 +176,9 @@
           "type": "chat",
           "message": "🐢 {user} puso a todos en cámara lenta 10 segundos"
         }
-      ]
+      ],
+      "enabled": false,
+      "target": "chat"
     },
     {
       "id": "comida",
@@ -180,7 +186,6 @@
         "type": "reward",
         "name": "Comida"
       },
-      "target": "all",
       "cooldownMs": 300000,
       "actions": [
         {
@@ -196,7 +201,9 @@
           "subtitle": "toma",
           "color": "gold"
         }
-      ]
+      ],
+      "enabled": false,
+      "target": "all"
     },
     {
       "id": "patrulla-warden",
@@ -230,7 +237,8 @@
           "type": "chat",
           "message": "👁️ {user} invocó una patrulla warden. Suerte, {target}..."
         }
-      ]
+      ],
+      "enabled": false
     },
     {
       "id": "modo-caos",
@@ -244,7 +252,8 @@
           "type": "caos",
           "seconds": 600
         }
-      ]
+      ],
+      "enabled": false
     },
     {
       "id": "bits-1000",
@@ -253,7 +262,6 @@
         "minAmount": 1000,
         "includeDonations": true
       },
-      "target": "random",
       "actions": [
         {
           "type": "minecraft",
@@ -272,7 +280,9 @@
           "type": "chat",
           "message": "🏹 ¡{user} mandó 50 esqueletos a {target}! Gracias por el apoyo 💜"
         }
-      ]
+      ],
+      "enabled": false,
+      "target": "random"
     },
     {
       "id": "bits-500",
@@ -301,7 +311,8 @@
           "type": "chat",
           "message": "☠️ ¡{user} invocó un Wither! Gracias por el apoyo 💜"
         }
-      ]
+      ],
+      "enabled": false
     },
     {
       "id": "bits-100",
@@ -311,7 +322,6 @@
         "maxAmount": 499,
         "includeDonations": true
       },
-      "target": "random",
       "cooldownMs": 20000,
       "actions": [
         {
@@ -330,7 +340,9 @@
           "type": "chat",
           "message": "🧟 ¡{user} mandó 20 zombis a {target}! Gracias por el apoyo 💜"
         }
-      ]
+      ],
+      "enabled": false,
+      "target": "random"
     }
   ]
 }

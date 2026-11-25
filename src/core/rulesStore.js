@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { GAMERULES } from '../gamerules.js';
 
 export const TRIGGER_TYPES = ['reward', 'command', 'cheer', 'donation', 'sub', 'gift', 'raid', 'follow'];
-export const TARGETS = ['me', 'chat', 'random', 'all'];
+export const TARGETS = ['me', 'chat', 'chat-random', 'random', 'all'];
 
 /**
  * Lee y guarda config/rules.json validando su contenido,

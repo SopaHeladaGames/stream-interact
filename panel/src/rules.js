@@ -27,6 +27,7 @@ export const ACTIONS = {
 export const TARGETS = {
   me: { label: 'Tú', hint: 'Siempre a ti ({player})' },
   chat: { label: 'Lo elige el chat', hint: 'Al jugador que escriba el espectador' },
+  'chat-random': { label: 'El chat o al azar', hint: 'Al jugador que escriba el espectador; si no escribe ninguno, a alguien al azar' },
   random: { label: 'Al azar', hint: 'A alguien conectado al azar (te incluye)' },
   all: { label: 'Todos', hint: 'A todos los conectados' }
 };

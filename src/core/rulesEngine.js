@@ -117,9 +117,11 @@ export class RulesEngine {
 
     // ¿A quién le toca? Si el espectador eligió a alguien que no está, se le avisa y se devuelven los puntos
     let target = null;
-    if (rule.target === 'chat' && this.targets) {
+    // En "chat-random" sin nombre no se decide aquí: el azar se elige al ejecutarse, con los conectados de ese momento
+    const named = String(event.input ?? '').trim() !== '';
+    if (this.targets && (rule.target === 'chat' || (rule.target === 'chat-random' && named))) {
       const strict = event.type === 'reward' || event.type === 'command';
-      target = await this.targets.resolve('chat', event.input, { strict });
+      target = await this.targets.resolve(rule.target, event.input, { strict });
       if (target.error) {
         log.warn(`"${ruleKey}" de ${event.user.displayName}: ${target.error}`);
         const refunded = event.refund ? await event.refund().then(() => true, () => false) : false;

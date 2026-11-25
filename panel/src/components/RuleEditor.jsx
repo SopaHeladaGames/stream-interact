@@ -458,6 +458,12 @@ function TargetSection({ rule, set }) {
           {(type === 'cheer' || type === 'donation') && <>Se busca un nombre en el mensaje del {type === 'cheer' ? 'cheer' : 'donativo'}; si no hay uno válido te toca a ti (nunca se pierde un {type === 'cheer' ? 'cheer' : 'donativo'}). </>}
           {(type === 'reward' || type === 'command') && 'Si el jugador no está conectado o está protegido, no se ejecuta, se le avisa en el chat y se devuelven los puntos.'}
         </>}
+        {mode === 'chat-random' && <>
+          {type === 'command' && <>Con nombre, por ejemplo <code>{rule.trigger?.name || '!comando'} Many</code>, le llega a ese jugador. Sin nombre, a alguien al azar (tú incluido). </>}
+          {type === 'reward' && <>Si el espectador escribe un nombre al canjear, le llega a ese jugador; si lo deja vacío, a alguien al azar. Activa “Pedir texto al espectador” en la recompensa. </>}
+          {!['command', 'reward'].includes(type) && <>Si el mensaje trae el nombre de un jugador conectado, le llega a él; si no, a alguien al azar. </>}
+          {(type === 'reward' || type === 'command') && 'Si escriben un nombre que no está conectado o que está protegido, no se ejecuta, se le avisa en el chat y se devuelven los puntos.'}
+        </>}
         {mode === 'random' && 'Se elige al ejecutarse, entre los conectados que no estén protegidos (tú incluido).'}
         {mode === 'all' && 'A todos los conectados menos los protegidos. En los textos, {target} se lee como “todos”.'}
       </p>

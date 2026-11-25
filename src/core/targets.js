@@ -9,13 +9,14 @@ import { log } from './logger.js';
  *   me     → siempre tú ({player} del .env)
  *   chat   → el jugador que escriba el espectador (texto de la recompensa o "!comando Nombre")
  *   random → uno al azar entre los conectados (te incluye)
+ *   chat-random → como chat si escriben un nombre; si no escriben ninguno, al azar
  *   all    → todos los conectados
  *
  * Los jugadores protegidos nunca reciben nada del chat (tú no te puedes proteger).
  * Los apodos traducen cómo te escribe el chat ("many") a la cuenta de Minecraft.
  * Se guardan en config/jugadores.json.
  */
-export const TARGET_MODES = ['me', 'chat', 'random', 'all'];
+export const TARGET_MODES = ['me', 'chat', 'chat-random', 'random', 'all'];
 const NAME = /^[A-Za-z0-9_]{3,16}$/;
 const ALIAS = /^[\p{L}\p{N}_]{2,25}$/u;
 const httpError = (status, message) => Object.assign(new Error(message), { status });
@@ -92,19 +93,22 @@ export class PlayerTargets {
       return { mode, name: null, selector, display: 'todos' };
     }
 
-    if (mode === 'random') {
+    const pickRandom = () => {
       const pool = (online ?? []).filter((n) => !this.isProtected(n));
       if (pool.length === 0) return this.#self();
       const name = pool[Math.floor(Math.random() * pool.length)];
       return { mode, name, selector: name, display: name };
-    }
+    };
+    if (mode === 'random') return pickRandom();
 
-    // mode === 'chat'
+    // mode === 'chat' o 'chat-random'
+    // Sin nombre válido: en "chat" te toca a ti; en "chat-random", a alguien al azar
+    const fallback = mode === 'chat-random' ? pickRandom : () => this.#self();
     const words = String(input ?? '').split(/[\s,]+/).map((w) => w.replace(/^@/, '').replace(/[^\p{L}\p{N}_]/gu, '')).filter(Boolean);
-    if (words.length === 0) return this.#self(); // sin texto: te toca a ti
+    if (words.length === 0) return fallback(); // sin texto
 
     if (online === null) {
-      return strict ? { error: 'No puedo ver quién está conectado en Minecraft ahora mismo.' } : this.#self();
+      return strict ? { error: 'No puedo ver quién está conectado en Minecraft ahora mismo.' } : fallback();
     }
     for (const w of words) {
       const wanted = this.data.aliases[norm(w)] ?? w;
@@ -119,6 +123,6 @@ export class PlayerTargets {
     const asked = words.join(' ').slice(0, 30);
     log.warn(`Objetivo "${asked}" no está conectado`);
     const available = online.filter((n) => !this.isProtected(n)).join(', ') || 'nadie';
-    return strict ? { error: `No encontré a "${asked}" en el servidor. Conectados: ${available}.` } : this.#self();
+    return strict ? { error: `No encontré a "${asked}" en el servidor. Conectados: ${available}.` } : fallback();
   }
 }
