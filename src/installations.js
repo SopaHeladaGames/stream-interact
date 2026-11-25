@@ -113,14 +113,21 @@ export function javaVersion(java) {
 export function prepareInstallation(dir, { rconPort, rconPassword, serverPort = 25565 }) {
   // Nunca escribir valores vacíos o "undefined" (dejarían RCON sin funcionar)
   if (!rconPassword || !Number.isInteger(Number(rconPort))) throw new Error('Falta la contraseña o el puerto de RCON para preparar server.properties');
-  const file = path.join(dir, 'server.properties');
-  let text = '';
-  try { text = fs.readFileSync(file, 'utf8'); } catch { /* primera vez: el servidor completa el resto al arrancar */ }
   const wanted = {
     'enable-rcon': 'true', 'rcon.port': String(rconPort), 'rcon.password': rconPassword, 'server-port': String(serverPort),
     // Que los comandos de la app y de la consola del panel no llenen el chat de los ops con "[Rcon: …]"
     'broadcast-rcon-to-ops': 'false', 'broadcast-console-to-ops': 'false'
   };
+  const changed = writeServerProperties(dir, wanted);
+  if (changed.length) log.info(`server.properties ajustado: ${changed.map((k) => (k === 'rcon.password' ? 'contraseña de RCON' : k)).join(', ')}`);
+  return changed;
+}
+
+/** Cambia claves de server.properties sin tocar el resto del archivo. Devuelve las que cambiaron. */
+export function writeServerProperties(dir, wanted) {
+  const file = path.join(dir, 'server.properties');
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch { /* primera vez: el servidor completa el resto al arrancar */ }
   const lines = text ? text.split(/\r?\n/) : ['#Minecraft server properties'];
   const changed = [];
   for (const [key, value] of Object.entries(wanted)) {
@@ -128,10 +135,7 @@ export function prepareInstallation(dir, { rconPort, rconPassword, serverPort = 
     if (i === -1) { lines.splice(lines[lines.length - 1] === '' ? lines.length - 1 : lines.length, 0, `${key}=${value}`); changed.push(key); }
     else if (lines[i] !== `${key}=${value}`) { lines[i] = `${key}=${value}`; changed.push(key); }
   }
-  if (changed.length) {
-    fs.writeFileSync(file, lines.join('\n').replace(/\n*$/, '\n'));
-    log.info(`server.properties ajustado: ${changed.map((k) => (k === 'rcon.password' ? 'contraseña de RCON' : k)).join(', ')}`);
-  }
+  if (changed.length) fs.writeFileSync(file, lines.join('\n').replace(/\n*$/, '\n'));
   return changed;
 }
 

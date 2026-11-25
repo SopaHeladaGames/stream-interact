@@ -1,6 +1,6 @@
 {
   "name": "stream-interact",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Permite que el chat de tus directos (Twitch, luego Kick/YouTube) interactúe con tu juego.",
   "type": "module",
   "main": "electron/main.js",

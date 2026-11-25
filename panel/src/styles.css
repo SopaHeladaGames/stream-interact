@@ -597,3 +597,9 @@ select.invalid { border-color: var(--error); color: var(--error); }
 .profile-chip.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .profile-chip button { all: unset; cursor: pointer; opacity: .6; font-size: 12px; }
 .profile-chip button:hover { opacity: 1; }
+
+/* Distancia de visión (página Servidor) */
+.distance-card .distance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 12px 0; }
+.distance-card .slider { display: flex; flex-direction: column; gap: 6px; }
+.distance-card .slider-head { display: flex; justify-content: space-between; font-size: 13px; }
+@media (max-width: 900px) { .distance-card .distance-grid { grid-template-columns: 1fr; } }

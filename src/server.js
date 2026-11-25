@@ -7,8 +7,8 @@ import { log } from './core/logger.js';
 const APP_ROOT = process.env.STREAM_INTERACT_ROOT || process.cwd();
 import { chatFeed } from './core/chatFeed.js';
 import { overlayFeed } from './core/overlayFeed.js';
-import { PlayerManager } from './minecraftPlayers.js';
-import { detectInstallation, detectJavas, javaVersion } from './installations.js';
+import { PlayerManager, readServerProperties } from './minecraftPlayers.js';
+import { detectInstallation, detectJavas, javaVersion, writeServerProperties } from './installations.js';
 import { GAMERULES } from './gamerules.js';
 
 /**
@@ -429,6 +429,28 @@ export function registerServerRoutes(app, { mcServer, mc, installations, backups
   app.post('/api/servidor/jugadores/expulsar', route((req) => players.kick(req.body?.name, req.body?.reason)));
   app.get('/api/servidor/whitelist', route(() => players.whitelist()));
   app.post('/api/servidor/whitelist', route((req) => players.whitelistAction(req.body?.action, req.body?.name)));
+
+  // Distancia de visión y de simulación (server.properties). Se aplican al iniciar el servidor.
+  const distance = () => {
+    const dir = mcServer.dir;
+    if (!dir) throw Object.assign(new Error('No hay una instalación activa'), { status: 400 });
+    const props = readServerProperties(dir);
+    const running = ['starting', 'running', 'stopping', 'external'].includes(mcServer.state);
+    // Lo que el servidor está usando ahora (lo que había al arrancar) vs lo guardado en el archivo
+    return { viewDistance: Number(props['view-distance']) || 10, simulationDistance: Number(props['simulation-distance']) || 10, running, applied: mcServer.appliedDistance ?? null };
+  };
+  app.get('/api/servidor/distancia', route(() => distance()));
+  app.put('/api/servidor/distancia', route((req) => {
+    const clamp = (v, min, max) => Math.min(max, Math.max(min, Math.round(Number(v))));
+    const view = clamp(req.body?.viewDistance, 3, 32);
+    const sim = clamp(req.body?.simulationDistance, 5, 32);
+    if (!Number.isFinite(view) || !Number.isFinite(sim)) throw Object.assign(new Error('Distancias inválidas'), { status: 400 });
+    const dir = mcServer.dir;
+    if (!dir) throw Object.assign(new Error('No hay una instalación activa'), { status: 400 });
+    writeServerProperties(dir, { 'view-distance': String(view), 'simulation-distance': String(sim) });
+    log.info(`👁 Distancia de visión ${view}, de simulación ${sim} (se aplica al iniciar el servidor)`);
+    return distance();
+  }));
 
   app.post('/api/servidor/iniciar', route(() => { mcServer.start(); return mcServer.status(); }));
   app.post('/api/servidor/detener', route(async () => { await mcServer.stop(); return mcServer.status(); }));

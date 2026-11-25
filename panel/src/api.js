@@ -107,6 +107,8 @@ export const api = {
   iniciarServidor: () => request('POST', '/api/servidor/iniciar'),
   detenerServidor: () => request('POST', '/api/servidor/detener'),
   reiniciarServidor: () => request('POST', '/api/servidor/reiniciar'),
+  distancia: () => request('GET', '/api/servidor/distancia'),
+  guardarDistancia: (body) => request('PUT', '/api/servidor/distancia', body),
   comandoServidor: (command) => request('POST', '/api/servidor/comando', { command })
 };
 

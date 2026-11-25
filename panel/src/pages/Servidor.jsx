@@ -3,6 +3,7 @@ import { api, subscribeConsole } from '../api.js';
 import ServidorJugadores from '../components/ServidorJugadores.jsx';
 import ServidorRespaldos from '../components/ServidorRespaldos.jsx';
 import ServidorGamerules from '../components/ServidorGamerules.jsx';
+import ServidorDistancia from '../components/ServidorDistancia.jsx';
 
 const STATE = {
   stopped: { label: 'Detenido', dot: 'off' },
@@ -136,6 +137,8 @@ export default function Servidor({ go }) {
       <ServidorRespaldos serverState={s} />
 
       <ServidorGamerules rcon={Boolean(status?.rcon)} />
+
+      <ServidorDistancia serverState={s} />
 
       <div className="section-head">
         <h2>Consola</h2>

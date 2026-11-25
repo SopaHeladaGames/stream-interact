@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { log } from './core/logger.js';
 import { detectInstallation, prepareInstallation, readRconPassword } from './installations.js';
+import { readServerProperties } from './minecraftPlayers.js';
 
 const MAX_LINES = 1000;
 const ANSI = /\u001b\[[0-9;?]*[ -\/]*[@-~]/g;
@@ -88,6 +89,9 @@ export class MinecraftServer {
     if (!info.launch) throw httpError(400, `No encontré un servidor en ${this.dir} (ni un .jar ni una instalación de NeoForge/Forge)`);
     if (!info.eula) throw httpError(400, 'Falta aceptar el EULA de Minecraft en esta instalación (en la página Instalaciones → Editar).');
     if (this.rcon) prepareInstallation(this.dir, { rconPort: this.rcon.port, rconPassword: this.rcon.password });
+    // Distancias con las que arranca (para avisar en el panel si se cambian y falta reiniciar)
+    const props = readServerProperties(this.dir);
+    this.appliedDistance = { viewDistance: Number(props['view-distance']) || 10, simulationDistance: Number(props['simulation-distance']) || 10 };
 
     clearTimeout(this.restartTimer);
     this.stopRequested = false;
